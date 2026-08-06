@@ -18,6 +18,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.example.model.Song
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,6 +34,11 @@ fun ExpandedPlayer(
     onQueueClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    fun showToast(msg: String) {
+        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -47,12 +54,12 @@ fun ExpandedPlayer(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(WindowInsets.systemBars.asPaddingValues())
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(24.dp)
+                .systemBarsPadding()
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onClose) {
@@ -70,19 +77,17 @@ fun ExpandedPlayer(
                     color = MaterialTheme.colorScheme.onBackground
                 )
                 Spacer(modifier = Modifier.weight(1f))
-                IconButton(onClick = { /* TODO: Player Menu */ }) {
+                IconButton(onClick = { showToast("Player Menu not implemented") }) {
                     Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Rounded.MoreVert,
+                        imageVector = Icons.Rounded.MoreVert,
                         contentDescription = "More options",
                         tint = MaterialTheme.colorScheme.onBackground
                     )
                 }
             }
-
             Spacer(modifier = Modifier.height(32.dp))
-
             AsyncImage(
-                model = coil.request.ImageRequest.Builder(androidx.compose.ui.platform.LocalContext.current)
+                model = coil.request.ImageRequest.Builder(LocalContext.current)
                     .data(song.artworkUrl)
                     .crossfade(true)
                     .build(),
@@ -93,9 +98,7 @@ fun ExpandedPlayer(
                     .clip(RoundedCornerShape(24.dp)),
                 contentScale = ContentScale.Crop
             )
-
             Spacer(modifier = Modifier.height(48.dp))
-
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -114,9 +117,9 @@ fun ExpandedPlayer(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                IconButton(onClick = { /* TODO: Favorite */ }) {
+                IconButton(onClick = { showToast("Favorite not implemented") }) {
                     Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Rounded.FavoriteBorder,
+                        imageVector = Icons.Rounded.FavoriteBorder,
                         contentDescription = "Favorite",
                         tint = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.size(28.dp)
@@ -127,19 +130,17 @@ fun ExpandedPlayer(
             Spacer(modifier = Modifier.height(16.dp))
             
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                IconButton(onClick = { /* TODO: Download */ }) {
-                    Icon(imageVector = androidx.compose.material.icons.Icons.Rounded.Download, contentDescription = "Download", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                IconButton(onClick = { showToast("Download not implemented") }) {
+                    Icon(imageVector = Icons.Rounded.Download, contentDescription = "Download", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                IconButton(onClick = { /* TODO: Add to Playlist */ }) {
+                IconButton(onClick = { showToast("Add to Playlist not implemented") }) {
                     Icon(imageVector = Icons.AutoMirrored.Rounded.PlaylistAdd, contentDescription = "Add to playlist", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                IconButton(onClick = { /* TODO: Share */ }) {
-                    Icon(imageVector = androidx.compose.material.icons.Icons.Rounded.Share, contentDescription = "Share", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                IconButton(onClick = { showToast("Share not implemented") }) {
+                    Icon(imageVector = Icons.Rounded.Share, contentDescription = "Share", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
-
             Spacer(modifier = Modifier.weight(1f))
-
             Slider(
                 value = progress,
                 onValueChange = {},
@@ -150,7 +151,6 @@ fun ExpandedPlayer(
                 ),
                 modifier = Modifier.fillMaxWidth()
             )
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -164,22 +164,19 @@ fun ExpandedPlayer(
                 val seconds = (song.duration / 1000) % 60
                 Text("${minutes}:${seconds.toString().padStart(2, '0')}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-
             Spacer(modifier = Modifier.weight(1f))
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { /* TODO */ }) {
+                IconButton(onClick = { showToast("Action not implemented") }) {
                     Icon(
                         imageVector = Icons.Rounded.Shuffle,
                         contentDescription = "Shuffle",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-
                 IconButton(onClick = onPrevious, modifier = Modifier.size(64.dp)) {
                     Icon(
                         imageVector = Icons.Rounded.SkipPrevious,
@@ -188,7 +185,6 @@ fun ExpandedPlayer(
                         modifier = Modifier.size(48.dp)
                     )
                 }
-
                 IconButton(onClick = onPlayPause, modifier = Modifier.size(96.dp)) {
                     Icon(
                         imageVector = if (isPlaying) Icons.Rounded.PauseCircleFilled else Icons.Rounded.PlayCircleFilled,
@@ -197,7 +193,6 @@ fun ExpandedPlayer(
                         modifier = Modifier.size(96.dp)
                     )
                 }
-
                 IconButton(onClick = onNext, modifier = Modifier.size(64.dp)) {
                     Icon(
                         imageVector = Icons.Rounded.SkipNext,
@@ -206,8 +201,7 @@ fun ExpandedPlayer(
                         modifier = Modifier.size(48.dp)
                     )
                 }
-
-                IconButton(onClick = { /* TODO */ }) {
+                IconButton(onClick = { showToast("Action not implemented") }) {
                     Icon(
                         imageVector = Icons.Rounded.Repeat,
                         contentDescription = "Repeat",
@@ -221,9 +215,9 @@ fun ExpandedPlayer(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { /* TODO: Sound Quality/Equalizer */ }) {
+                IconButton(onClick = { showToast("Equalizer not implemented") }) {
                     Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Rounded.Speaker,
+                        imageVector = Icons.Rounded.Speaker,
                         contentDescription = "Audio options",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )

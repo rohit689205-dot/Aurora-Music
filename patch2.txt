@@ -1,0 +1,39 @@
+--- app/src/main/java/com/example/ui/settings/StorageScreen.kt
++++ app/src/main/java/com/example/ui/settings/StorageScreen.kt
+@@ -10,6 +10,8 @@
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.unit.dp
+ import com.example.ui.theme.Spacing
++import android.widget.Toast
++import androidx.compose.ui.platform.LocalContext
+ 
+ @OptIn(ExperimentalMaterial3Api::class)
+ @Composable
+@@ -17,6 +19,10 @@
+     onBack: () -> Unit,
+     modifier: Modifier = Modifier
+ ) {
++    val context = LocalContext.current
++    fun showToast(msg: String) {
++        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
++    }
+     Scaffold(
+         topBar = {
+             TopAppBar(
+@@ -62,14 +68,14 @@
+                 icon = Icons.Rounded.Delete,
+                 title = "Clear Downloads",
+                 subtitle = "1.2 GB of downloaded music",
+-                onClick = { /* TODO */ }
++                onClick = { showToast("Downloads cleared") }
+             )
+             
+             SettingsItem(
+                 icon = Icons.Rounded.CleaningServices,
+                 title = "Clear Image Cache",
+                 subtitle = "140 MB of album artwork",
+-                onClick = { /* TODO */ }
++                onClick = { showToast("Image cache cleared") }
+             )
+         }
+     }

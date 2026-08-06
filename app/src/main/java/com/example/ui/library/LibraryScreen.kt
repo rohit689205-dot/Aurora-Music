@@ -1,5 +1,6 @@
 package com.example.ui.library
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -8,6 +9,7 @@ import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.model.Song
@@ -15,7 +17,6 @@ import com.example.ui.components.SongListItem
 import com.example.ui.components.SkeletonSongListItem
 import com.example.ui.components.QuickActionCard
 import com.example.ui.theme.Spacing
-
 import com.example.ui.state.UiState
 import androidx.compose.ui.Alignment
 
@@ -28,6 +29,12 @@ fun LibraryScreen(
     onNavigateToSearch: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    
+    fun showToast(msg: String) {
+        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+    }
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 100.dp)
@@ -49,7 +56,7 @@ fun LibraryScreen(
                         IconButton(onClick = onNavigateToSearch) {
                             Icon(Icons.Rounded.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        IconButton(onClick = { /* TODO */ }) {
+                        IconButton(onClick = { showToast("Add Playlist not implemented") }) {
                             Icon(Icons.Rounded.Add, contentDescription = "Add", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
@@ -62,13 +69,25 @@ fun LibraryScreen(
                     QuickActionCard(
                         icon = Icons.Rounded.PlayArrow,
                         label = "Play All",
-                        onClick = { /* TODO */ },
+                        onClick = {
+                            if (songsState is UiState.Success && songsState.data.isNotEmpty()) {
+                                onSongClick(songsState.data.first())
+                            } else {
+                                showToast("No songs to play")
+                            }
+                        },
                         modifier = Modifier.weight(1f)
                     )
                     QuickActionCard(
                         icon = Icons.Rounded.Shuffle,
                         label = "Shuffle All",
-                        onClick = { /* TODO */ },
+                        onClick = {
+                            if (songsState is UiState.Success && songsState.data.isNotEmpty()) {
+                                onSongClick(songsState.data.random())
+                            } else {
+                                showToast("No songs to shuffle")
+                            }
+                        },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -77,7 +96,7 @@ fun LibraryScreen(
                     QuickActionCard(
                         icon = Icons.Rounded.Favorite,
                         label = "Favorites",
-                        onClick = { /* TODO */ },
+                        onClick = { showToast("Favorites not implemented") },
                         modifier = Modifier.weight(1f)
                     )
                     QuickActionCard(
@@ -92,7 +111,7 @@ fun LibraryScreen(
                     QuickActionCard(
                         icon = Icons.Rounded.Folder,
                         label = "Local Files",
-                        onClick = { /* TODO */ },
+                        onClick = { showToast("Local Files not implemented") },
                         modifier = Modifier.weight(1f)
                     )
                     QuickActionCard(

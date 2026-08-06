@@ -1,0 +1,23 @@
+--- app/src/main/java/com/example/ui/player/ExpandedPlayer.kt
++++ app/src/main/java/com/example/ui/player/ExpandedPlayer.kt
+@@ -19,6 +19,8 @@
+ import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.ui.unit.dp
+ import com.example.model.Song
++import android.widget.Toast
++import androidx.compose.ui.platform.LocalContext
+ 
+ @Composable
+ fun ExpandedPlayer(
+@@ -31,6 +33,11 @@
+     onQueueClick: () -> Unit,
+     modifier: Modifier = Modifier
+ ) {
++    val context = LocalContext.current
++    fun showToast(msg: String) {
++        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
++    }
++
+     Surface(
+         modifier = modifier.fillMaxSize(),
+         color = MaterialTheme.colorScheme.background

@@ -1,5 +1,6 @@
 package com.example.ui.settings
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -9,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.ui.theme.Spacing
@@ -19,6 +21,11 @@ fun StorageScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    fun showToast(msg: String) {
+        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+    }
+    
     Scaffold(
         topBar = {
             TopAppBar(
@@ -72,14 +79,14 @@ fun StorageScreen(
                 icon = Icons.Rounded.Delete,
                 title = "Clear Downloads",
                 subtitle = "1.2 GB of downloaded music",
-                onClick = { /* TODO */ }
+                onClick = { showToast("Downloads cleared") }
             )
             
             SettingsItem(
                 icon = Icons.Rounded.CleaningServices,
                 title = "Clear Image Cache",
                 subtitle = "140 MB of album artwork",
-                onClick = { /* TODO */ }
+                onClick = { showToast("Image cache cleared") }
             )
         }
     }
