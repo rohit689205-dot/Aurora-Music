@@ -1,7 +1,6 @@
 package com.example.playback
 
 import android.content.Intent
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 
@@ -10,7 +9,7 @@ class AuroraMediaSessionService : MediaSessionService() {
     
     override fun onCreate() {
         super.onCreate()
-        val player = ExoPlayer.Builder(this).build()
+        val player = AudioPlayerManager.getOrCreatePlayer(this)
         mediaSession = MediaSession.Builder(this, player).build()
     }
     
@@ -20,7 +19,6 @@ class AuroraMediaSessionService : MediaSessionService() {
     
     override fun onDestroy() {
         mediaSession?.run {
-            player.release()
             release()
             mediaSession = null
         }

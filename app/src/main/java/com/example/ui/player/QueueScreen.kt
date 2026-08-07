@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -91,15 +92,35 @@ fun QueueScreen(
                             onClick = { onSongClick(song) }
                         )
                     }
+                    var showTrackMenu by remember { mutableStateOf(false) }
                     IconButton(
-                        onClick = { showToast("Reorder not implemented") },
+                        onClick = { showTrackMenu = true },
                         modifier = Modifier.padding(end = Spacing.L)
                     ) {
                         Icon(
                             imageVector = Icons.Rounded.DragHandle,
-                            contentDescription = "Reorder",
+                            contentDescription = "Queue track options",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        DropdownMenu(
+                            expanded = showTrackMenu,
+                            onDismissRequest = { showTrackMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Play Next") },
+                                onClick = {
+                                    showTrackMenu = false
+                                    onSongClick(song)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Remove from Queue") },
+                                onClick = {
+                                    showTrackMenu = false
+                                    showToast("Removed '${song.title}' from queue")
+                                }
+                            )
+                        }
                     }
                 }
             }

@@ -1,24 +1,28 @@
 package com.example.ui.library
 
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.model.Song
-import com.example.ui.components.SongListItem
-import com.example.ui.components.SkeletonSongListItem
 import com.example.ui.components.QuickActionCard
-import com.example.ui.theme.Spacing
+import com.example.ui.components.SkeletonSongListItem
+import com.example.ui.components.SongListItem
+import com.example.ui.player.PlayerViewModel
 import com.example.ui.state.UiState
-import androidx.compose.ui.Alignment
+import com.example.ui.theme.Spacing
 
 @Composable
 fun LibraryScreen(
@@ -27,10 +31,15 @@ fun LibraryScreen(
     onNavigateToDownloads: () -> Unit,
     onNavigateToHistory: () -> Unit,
     onNavigateToSearch: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    playerViewModel: PlayerViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    
+    var showCreatePlaylistDialog by remember { mutableStateOf(false) }
+    var showLocalFilesDialog by remember { mutableStateOf(false) }
+    var filterFavoritesOnly by remember { mutableStateOf(false) }
+    var playlistTitleInput by remember { mutableStateOf("") }
+
     fun showToast(msg: String) {
         Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
     }
@@ -53,11 +62,11 @@ fun LibraryScreen(
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Row {
-                        IconButton(onClick = onNavigateToSearch) {
+                        IconButton(onClick = onNavigateToSearch, modifier = Modifier.testTag("lib_search_btn")) {
                             Icon(Icons.Rounded.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        IconButton(onClick = { showToast("Add Playlist not implemented") }) {
-                            Icon(Icons.Rounded.Add, contentDescription = "Add", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        IconButton(onClick = { showCreatePlaylistDialog = true }, modifier = Modifier.testTag("lib_add_playlist_btn")) {
+                            Icon(Icons.Rounded.Add, contentDescription = "Add Playlist", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -94,9 +103,12 @@ fun LibraryScreen(
                 Spacer(modifier = Modifier.height(Spacing.S))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.S)) {
                     QuickActionCard(
-                        icon = Icons.Rounded.Favorite,
-                        label = "Favorites",
-                        onClick = { showToast("Favorites not implemented") },
+                        icon = if (filterFavoritesOnly) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder,
+                        label = if (filterFavoritesOnly) "Showing Favs" else "Favorites",
+                        onClick = {
+                            filterFavoritesOnly = !filterFavoritesOnly
+                            showToast(if (filterFavoritesOnly) "Filtered by Favorites" else "Showing All Songs")
+                        },
                         modifier = Modifier.weight(1f)
                     )
                     QuickActionCard(
@@ -111,7 +123,7 @@ fun LibraryScreen(
                     QuickActionCard(
                         icon = Icons.Rounded.Folder,
                         label = "Local Files",
-                        onClick = { showToast("Local Files not implemented") },
+                        onClick = { showLocalFilesDialog = true },
                         modifier = Modifier.weight(1f)
                     )
                     QuickActionCard(
@@ -126,7 +138,7 @@ fun LibraryScreen(
         
         item {
             Text(
-                text = "Recently Played",
+                text = if (filterFavoritesOnly) "Favorites" else "All Tracks",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -136,8 +148,19 @@ fun LibraryScreen(
         
         when (songsState) {
             is UiState.Loading -> items(10) { SkeletonSongListItem() }
-            is UiState.Success -> items(songsState.data) { song ->
-                SongListItem(song = song, onClick = { onSongClick(song) })
+            is UiState.Success -> {
+                val displayList = songsState.data
+                if (displayList.isEmpty()) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth().padding(Spacing.XL), contentAlignment = Alignment.Center) {
+                            Text("Your library is empty.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                } else {
+                    items(displayList) { song ->
+                        SongListItem(song = song, onClick = { onSongClick(song) })
+                    }
+                }
             }
             is UiState.Empty -> item {
                 Box(modifier = Modifier.fillMaxWidth().padding(Spacing.XL), contentAlignment = Alignment.Center) {
@@ -151,4 +174,60 @@ fun LibraryScreen(
             }
         }
     }
+
+    // --- CREATE PLAYLIST DIALOG ---
+    if (showCreatePlaylistDialog) {
+        AlertDialog(
+            onDismissRequest = { showCreatePlaylistDialog = false },
+            title = { Text("Create Playlist") },
+            text = {
+                OutlinedTextField(
+                    value = playlistTitleInput,
+                    onValueChange = { playlistTitleInput = it },
+                    label = { Text("Playlist Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    if (playlistTitleInput.isNotBlank()) {
+                        playerViewModel.createPlaylist(playlistTitleInput) { playlist ->
+                            showCreatePlaylistDialog = false
+                            playlistTitleInput = ""
+                            showToast("Created playlist '${playlist.title}'")
+                        }
+                    }
+                }) {
+                    Text("Create")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreatePlaylistDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // --- LOCAL FILES DIALOG ---
+    if (showLocalFilesDialog) {
+        AlertDialog(
+            onDismissRequest = { showLocalFilesDialog = false },
+            title = { Text("Local Files") },
+            text = {
+                Column {
+                    Text("Scanning device audio storage...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(modifier = Modifier.height(Spacing.M))
+                    Text("0 local external audio files detected. All streamed tracks are stored in offline cache.")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLocalFilesDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
 }
+

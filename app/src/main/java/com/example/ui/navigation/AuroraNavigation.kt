@@ -3,18 +3,26 @@ package com.example.ui.navigation
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.LibraryMusic
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -27,6 +35,7 @@ import com.example.ui.library.LibraryScreen
 import com.example.ui.player.ExpandedPlayer
 import com.example.ui.player.MiniPlayer
 import com.example.ui.player.PlayerViewModel
+import com.example.ui.theme.Spacing
 
 sealed class Screen(val route: String, val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     object Home : Screen("home", "Home", Icons.Rounded.Home)
@@ -35,6 +44,19 @@ sealed class Screen(val route: String, val title: String, val icon: androidx.com
     object Settings : Screen("settings", "Settings", Icons.Rounded.Settings)
 }
 
+enum class FloatingNavItem(
+    val title: String,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+    val route: String?
+) {
+    HOME("Home", Icons.Rounded.Home, Screen.Home.route),
+    SEARCH("Search", Icons.Rounded.Search, Screen.Search.route),
+    VOICE("Voice Search", Icons.Rounded.Mic, null),
+    LIBRARY("Library", Icons.Rounded.LibraryMusic, Screen.Library.route),
+    MORE("More", Icons.Rounded.MoreHoriz, null)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuroraApp(playerViewModel: PlayerViewModel = viewModel()) {
     val navController = rememberNavController()
@@ -48,36 +70,36 @@ fun AuroraApp(playerViewModel: PlayerViewModel = viewModel()) {
     val progress by playerViewModel.progress.collectAsStateWithLifecycle()
 
     var isPlayerExpanded by remember { mutableStateOf(false) }
-
-    val items = listOf(Screen.Home, Screen.Search, Screen.Library, Screen.Settings)
+    var showMoreMenuSheet by remember { mutableStateOf(false) }
+    var showAboutDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.onSurface
-                ) {
-                    items.forEach { screen ->
-                        NavigationBarItem(
-                            icon = { Icon(screen.icon, contentDescription = screen.title) },
-                            label = { Text(screen.title) },
-                            selected = currentRoute == screen.route,
-                            onClick = {
-                                navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.startDestinationId) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
+                FloatingPillBottomBar(
+                    currentRoute = currentRoute,
+                    onItemClick = { navItem ->
+                        when (navItem) {
+                            FloatingNavItem.HOME,
+                            FloatingNavItem.SEARCH,
+                            FloatingNavItem.LIBRARY -> {
+                                navItem.route?.let { route ->
+                                    navController.navigate(route) {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
                                 }
-                            },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = MaterialTheme.colorScheme.primary,
-                                selectedTextColor = MaterialTheme.colorScheme.primary,
-                                indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                            )
-                        )
+                            }
+                            FloatingNavItem.VOICE -> {
+                                navController.navigate(Screen.Search.route)
+                            }
+                            FloatingNavItem.MORE -> {
+                                showMoreMenuSheet = true
+                            }
+                        }
                     }
-                }
+                )
             }
         }
     ) { innerPadding ->
@@ -97,9 +119,18 @@ fun AuroraApp(playerViewModel: PlayerViewModel = viewModel()) {
                         onGetStarted = { navController.navigate(Screen.Home.route) { popUpTo("welcome") { inclusive = true } } }
                     )
                 }
+                composable("playlist/{playlistId}") { backStackEntry ->
+                    val playlistId = backStackEntry.arguments?.getString("playlistId") ?: "PLDISKgbnvpk7sB1kRjLpA4gT_"
+                    com.example.ui.playlist.PlaylistScreen(
+                        playlistId = playlistId,
+                        onBack = { navController.popBackStack() },
+                        onSongClick = { song -> playerViewModel.playSong(song) }
+                    )
+                }
                 composable("playlist") {
                     com.example.ui.playlist.PlaylistScreen(
-                        onBack = { navController.popBackStack() }
+                        onBack = { navController.popBackStack() },
+                        onSongClick = { song -> playerViewModel.playSong(song) }
                     )
                 }
                 composable("album") {
@@ -107,9 +138,18 @@ fun AuroraApp(playerViewModel: PlayerViewModel = viewModel()) {
                         onBack = { navController.popBackStack() }
                     )
                 }
+                composable("artist/{channelId}") { backStackEntry ->
+                    val channelId = backStackEntry.arguments?.getString("channelId") ?: "M83"
+                    com.example.ui.artist.ArtistScreen(
+                        channelIdOrName = channelId,
+                        onBack = { navController.popBackStack() },
+                        onSongClick = { song -> playerViewModel.playSong(song) }
+                    )
+                }
                 composable("artist") {
                     com.example.ui.artist.ArtistScreen(
-                        onBack = { navController.popBackStack() }
+                        onBack = { navController.popBackStack() },
+                        onSongClick = { song -> playerViewModel.playSong(song) }
                     )
                 }
                 composable("podcast") {
@@ -129,14 +169,19 @@ fun AuroraApp(playerViewModel: PlayerViewModel = viewModel()) {
                 }
                 composable(Screen.Home.route) {
                     HomeScreen(
-                        songsState = songsState,
                         onSongClick = { song -> playerViewModel.playSong(song) },
-                        onNavigateToSearch = { navController.navigate(Screen.Search.route) }
+                        onNavigateToSearch = { navController.navigate(Screen.Search.route) },
+                        onNavigateToHistory = { navController.navigate("history") },
+                        onNavigateToProfile = { navController.navigate("profile") },
+                        onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
                     )
                 }
                 composable(Screen.Search.route) {
                     com.example.ui.search.SearchScreen(
-                        onBack = { navController.navigate(Screen.Home.route) }
+                        onBack = { navController.navigate(Screen.Home.route) },
+                        onSongSelect = { song -> playerViewModel.playSong(song) },
+                        onPlaylistSelect = { playlistId -> navController.navigate("playlist/$playlistId") },
+                        onArtistSelect = { channelId -> navController.navigate("artist/$channelId") }
                     )
                 }
                 composable(Screen.Library.route) {
@@ -180,14 +225,14 @@ fun AuroraApp(playerViewModel: PlayerViewModel = viewModel()) {
                 }
             }
 
-            // Mini Player overlay
+            // Mini Player overlay floating above bottom bar
             if (showBottomBar) {
                 currentSong?.let { song ->
                     if (!isPlayerExpanded) {
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
-                                .padding(bottom = innerPadding.calculateBottomPadding())
+                                .padding(bottom = 76.dp)
                         ) {
                             MiniPlayer(
                                 song = song,
@@ -231,4 +276,155 @@ fun AuroraApp(playerViewModel: PlayerViewModel = viewModel()) {
             )
         }
     }
+
+    // MORE MENU BOTTOM SHEET
+    if (showMoreMenuSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showMoreMenuSheet = false },
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurface
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(Spacing.XL)
+            ) {
+                Text(
+                    text = "Aurora Navigation",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(Spacing.M))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                Spacer(modifier = Modifier.height(Spacing.M))
+
+                MoreMenuItem("Queue", Icons.Outlined.QueueMusic) {
+                    showMoreMenuSheet = false
+                    navController.navigate("queue")
+                }
+                MoreMenuItem("Downloads", Icons.Outlined.Download) {
+                    showMoreMenuSheet = false
+                    navController.navigate("downloads")
+                }
+                MoreMenuItem("Playlists", Icons.Outlined.PlaylistPlay) {
+                    showMoreMenuSheet = false
+                    navController.navigate("playlist")
+                }
+                MoreMenuItem("Recently Played", Icons.Outlined.History) {
+                    showMoreMenuSheet = false
+                    navController.navigate("history")
+                }
+                MoreMenuItem("Favorites", Icons.Outlined.FavoriteBorder) {
+                    showMoreMenuSheet = false
+                    navController.navigate(Screen.Library.route)
+                }
+                MoreMenuItem("Settings", Icons.Outlined.Settings) {
+                    showMoreMenuSheet = false
+                    navController.navigate(Screen.Settings.route)
+                }
+                MoreMenuItem("About Aurora Music", Icons.Outlined.Info) {
+                    showMoreMenuSheet = false
+                    showAboutDialog = true
+                }
+
+                Spacer(modifier = Modifier.height(Spacing.L))
+            }
+        }
+    }
+
+    // ABOUT DIALOG
+    if (showAboutDialog) {
+        AlertDialog(
+            onDismissRequest = { showAboutDialog = false },
+            title = { Text("Aurora Music", fontWeight = FontWeight.Bold) },
+            text = {
+                Text("Version 2.0 (Aurora Edition)\n\nA modern, clean, music-focused streaming experience with Light and Dark themes, customizable density, and rich audio controls.")
+            },
+            confirmButton = {
+                TextButton(onClick = { showAboutDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
 }
+
+@Composable
+private fun MoreMenuItem(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
+    ListItem(
+        headlineContent = { Text(label, fontWeight = FontWeight.SemiBold) },
+        leadingContent = { Icon(icon, contentDescription = label) },
+        modifier = Modifier
+            .clickable { onClick() }
+            .testTag("more_item_${label.lowercase().replace(" ", "_")}")
+    )
+}
+
+@Composable
+fun FloatingPillBottomBar(
+    currentRoute: String?,
+    onItemClick: (FloatingNavItem) -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.XL, vertical = Spacing.M)
+            .windowInsetsPadding(WindowInsets.navigationBars),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = RoundedCornerShape(32.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
+            shadowElevation = 8.dp,
+            modifier = Modifier.height(64.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = Spacing.M)
+                    .fillMaxHeight(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                FloatingNavItem.values().forEach { item ->
+                    val isSelected = currentRoute == item.route
+
+                    val containerColor = if (isSelected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        Color.Transparent
+                    }
+
+                    val iconTint = if (isSelected) {
+                        MaterialTheme.colorScheme.onPrimary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(CircleShape)
+                            .background(containerColor)
+                            .clickable { onItemClick(item) }
+                            .testTag("floating_nav_${item.name.lowercase()}")
+                    ) {
+                        Icon(
+                            imageVector = item.icon,
+                            contentDescription = item.title,
+                            tint = iconTint,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+

@@ -2,8 +2,15 @@ package com.example.ui.settings
 
 import android.widget.Toast
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
@@ -12,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -24,18 +32,50 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = viewModel()
 ) {
+    val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
+    val uiDensity by viewModel.uiDensity.collectAsStateWithLifecycle()
+    val accentColor by viewModel.accentColor.collectAsStateWithLifecycle()
     val dynamicColor by viewModel.dynamicColor.collectAsStateWithLifecycle()
     val gaplessPlayback by viewModel.gaplessPlayback.collectAsStateWithLifecycle()
+    val crossfade by viewModel.crossfade.collectAsStateWithLifecycle()
     val pauseOnUnplug by viewModel.pauseOnUnplug.collectAsStateWithLifecycle()
+    
+    val audioQuality by viewModel.audioQuality.collectAsStateWithLifecycle()
+    val equalizerEnabled by viewModel.equalizerEnabled.collectAsStateWithLifecycle()
+    val equalizerPreset by viewModel.equalizerPreset.collectAsStateWithLifecycle()
+    val eqBand60Hz by viewModel.eqBand60Hz.collectAsStateWithLifecycle()
+    val eqBand230Hz by viewModel.eqBand230Hz.collectAsStateWithLifecycle()
+    val eqBand910Hz by viewModel.eqBand910Hz.collectAsStateWithLifecycle()
+    val eqBand4kHz by viewModel.eqBand4kHz.collectAsStateWithLifecycle()
+    val eqBand14kHz by viewModel.eqBand14kHz.collectAsStateWithLifecycle()
+    val eqBassBoost by viewModel.eqBassBoost.collectAsStateWithLifecycle()
+    val eq3dSurround by viewModel.eq3dSurround.collectAsStateWithLifecycle()
+
     val wifiOnlyDownloads by viewModel.wifiOnlyDownloads.collectAsStateWithLifecycle()
+    val downloadQuality by viewModel.downloadQuality.collectAsStateWithLifecycle()
     val offlineMode by viewModel.offlineMode.collectAsStateWithLifecycle()
+
     val playbackNotifications by viewModel.playbackNotifications.collectAsStateWithLifecycle()
     val newRecommendations by viewModel.newRecommendations.collectAsStateWithLifecycle()
     val largeText by viewModel.largeText.collectAsStateWithLifecycle()
 
+    val debugLogging by viewModel.debugLogging.collectAsStateWithLifecycle()
+    val mockDataMode by viewModel.mockDataMode.collectAsStateWithLifecycle()
+
     var developerModeUnlockClicks by remember { mutableIntStateOf(0) }
     val isDeveloperMode = developerModeUnlockClicks >= 7
     val context = LocalContext.current
+
+    // Dialog state controllers
+    var showThemeDialog by remember { mutableStateOf(false) }
+    var showUiDensityDialog by remember { mutableStateOf(false) }
+    var showCrossfadeDialog by remember { mutableStateOf(false) }
+    var showAudioQualityDialog by remember { mutableStateOf(false) }
+    var showEqualizerDialog by remember { mutableStateOf(false) }
+    var showDownloadQualityDialog by remember { mutableStateOf(false) }
+    var showDiagnosticsDialog by remember { mutableStateOf(false) }
+    var showClearHistoryDialog by remember { mutableStateOf(false) }
+    var showLicensesDialog by remember { mutableStateOf(false) }
 
     fun showToast(msg: String) {
         Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
@@ -60,21 +100,21 @@ fun SettingsScreen(
             SettingsItem(
                 icon = Icons.Rounded.Palette,
                 title = "Theme",
-                subtitle = "System Default",
-                onClick = { showToast("Theme selection not implemented") }
+                subtitle = "$themeMode • $accentColor",
+                onClick = { showThemeDialog = true }
             )
             SettingsSwitchItem(
                 icon = Icons.Rounded.FormatPaint,
                 title = "Dynamic Color",
-                subtitle = "Use Material You colors",
+                subtitle = "Use Material You dynamic system colors",
                 checked = dynamicColor,
                 onCheckedChange = { viewModel.setDynamicColor(it) }
             )
             SettingsItem(
                 icon = Icons.Rounded.ViewCompact,
                 title = "UI Density",
-                subtitle = "Comfortable",
-                onClick = { showToast("UI Density settings not implemented") }
+                subtitle = uiDensity,
+                onClick = { showUiDensityDialog = true }
             )
         }
 
@@ -90,8 +130,8 @@ fun SettingsScreen(
             SettingsItem(
                 icon = Icons.Rounded.CompareArrows,
                 title = "Crossfade",
-                subtitle = "Off",
-                onClick = { showToast("Crossfade settings not implemented") }
+                subtitle = crossfade,
+                onClick = { showCrossfadeDialog = true }
             )
             SettingsSwitchItem(
                 icon = Icons.Rounded.Headphones,
@@ -100,6 +140,12 @@ fun SettingsScreen(
                 checked = pauseOnUnplug,
                 onCheckedChange = { viewModel.setPauseOnUnplug(it) }
             )
+            SettingsItem(
+                icon = Icons.Rounded.BugReport,
+                title = "Playback Diagnostics",
+                subtitle = "View ExoPlayer state, audio focus & media logs",
+                onClick = { showDiagnosticsDialog = true }
+            )
         }
         
         item {
@@ -107,14 +153,14 @@ fun SettingsScreen(
             SettingsItem(
                 icon = Icons.Rounded.HighQuality,
                 title = "Audio Quality",
-                subtitle = "High",
-                onClick = { showToast("Audio Quality settings not implemented") }
+                subtitle = audioQuality,
+                onClick = { showAudioQualityDialog = true }
             )
             SettingsItem(
                 icon = Icons.Rounded.Equalizer,
                 title = "Equalizer",
-                subtitle = "Adjust audio settings",
-                onClick = { showToast("Equalizer not implemented") }
+                subtitle = "Preset: $equalizerPreset",
+                onClick = { showEqualizerDialog = true }
             )
         }
 
@@ -130,8 +176,8 @@ fun SettingsScreen(
             SettingsItem(
                 icon = Icons.Rounded.Download,
                 title = "Download Quality",
-                subtitle = "High",
-                onClick = { showToast("Download Quality settings not implemented") }
+                subtitle = downloadQuality,
+                onClick = { showDownloadQualityDialog = true }
             )
         }
         
@@ -186,8 +232,8 @@ fun SettingsScreen(
             SettingsItem(
                 icon = Icons.Rounded.History,
                 title = "Clear Listening History",
-                subtitle = "Remove all recently played items",
-                onClick = { showToast("History cleared") }
+                subtitle = "Remove all recently played items and search history",
+                onClick = { showClearHistoryDialog = true }
             )
         }
         
@@ -196,7 +242,7 @@ fun SettingsScreen(
             SettingsItem(
                 icon = Icons.Rounded.Info,
                 title = "Version",
-                subtitle = "1.0.0",
+                subtitle = "1.0.0 (Build 2026)",
                 onClick = {
                     if (!isDeveloperMode) {
                         developerModeUnlockClicks++
@@ -214,29 +260,512 @@ fun SettingsScreen(
             SettingsItem(
                 icon = Icons.Rounded.Description,
                 title = "Open Source Licenses",
-                onClick = { showToast("Licenses not implemented") }
+                subtitle = "View software license notices",
+                onClick = { showLicensesDialog = true }
             )
         }
         
         if (isDeveloperMode) {
             item {
                 SettingsCategory("Developer Options")
-                SettingsItem(
+                SettingsSwitchItem(
                     icon = Icons.Rounded.BugReport,
                     title = "Debug Logging",
-                    subtitle = "Enabled",
-                    onClick = { showToast("Toggled debug logging") }
+                    subtitle = "Log network and audio events to logcat",
+                    checked = debugLogging,
+                    onCheckedChange = { viewModel.setDebugLogging(it) }
                 )
-                SettingsItem(
+                SettingsSwitchItem(
                     icon = Icons.Rounded.Dataset,
                     title = "Mock Data Mode",
                     subtitle = "Load sample data on start",
-                    onClick = { showToast("Toggled mock data") }
+                    checked = mockDataMode,
+                    onCheckedChange = { viewModel.setMockDataMode(it) }
                 )
             }
         }
     }
+
+    // --- DIALOGS ---
+
+    // 1. Theme Dialog
+    if (showThemeDialog) {
+        AlertDialog(
+            onDismissRequest = { showThemeDialog = false },
+            title = { Text("Appearance Settings") },
+            text = {
+                Column {
+                    Text("Theme Mode", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(Spacing.S))
+                    val modes = listOf("System Default", "Light Mode", "Dark Mode", "AMOLED Pitch Black")
+                    Column(Modifier.selectableGroup()) {
+                        modes.forEach { mode ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .selectable(
+                                        selected = (mode == themeMode),
+                                        onClick = { viewModel.setThemeMode(mode) },
+                                        role = Role.RadioButton
+                                    )
+                                    .padding(vertical = Spacing.S),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(selected = (mode == themeMode), onClick = null)
+                                Spacer(modifier = Modifier.width(Spacing.M))
+                                Text(mode)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(Spacing.L))
+                    Text("Accent Color", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(Spacing.S))
+                    val accents = listOf("Emerald Green", "Sky Blue", "Electric Purple", "Hot Pink", "Gold")
+                    Column(Modifier.selectableGroup()) {
+                        accents.forEach { colorName ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .selectable(
+                                        selected = (colorName == accentColor),
+                                        onClick = { viewModel.setAccentColor(colorName) },
+                                        role = Role.RadioButton
+                                    )
+                                    .padding(vertical = Spacing.S),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(selected = (colorName == accentColor), onClick = null)
+                                Spacer(modifier = Modifier.width(Spacing.M))
+                                Text(colorName)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showThemeDialog = false }) {
+                    Text("Done")
+                }
+            }
+        )
+    }
+
+    // 2. UI Density Dialog
+    if (showUiDensityDialog) {
+        AlertDialog(
+            onDismissRequest = { showUiDensityDialog = false },
+            title = { Text("UI Density") },
+            text = {
+                val densities = listOf(
+                    "Compact" to "Condensed rows, tighter padding, compact items",
+                    "Comfortable" to "Standard layout with optimal padding & spacing",
+                    "Spacious" to "Generous margins, larger touch targets"
+                )
+                Column(Modifier.selectableGroup()) {
+                    densities.forEach { (density, desc) ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .selectable(
+                                    selected = (density == uiDensity),
+                                    onClick = {
+                                        viewModel.setUiDensity(density)
+                                    },
+                                    role = Role.RadioButton
+                                )
+                                .padding(vertical = Spacing.M),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = (density == uiDensity), onClick = null)
+                            Spacer(modifier = Modifier.width(Spacing.M))
+                            Column {
+                                Text(density, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                                Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showUiDensityDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+
+    // 3. Crossfade Dialog
+    if (showCrossfadeDialog) {
+        AlertDialog(
+            onDismissRequest = { showCrossfadeDialog = false },
+            title = { Text("Crossfade Duration") },
+            text = {
+                val options = listOf("0s", "3s", "5s")
+                Column(Modifier.selectableGroup()) {
+                    options.forEach { opt ->
+                        val labelText = if (opt == "0s") "0s (Off)" else opt
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .selectable(
+                                    selected = (opt == crossfade),
+                                    onClick = {
+                                        viewModel.setCrossfade(opt)
+                                        showCrossfadeDialog = false
+                                    },
+                                    role = Role.RadioButton
+                                )
+                                .padding(vertical = Spacing.S),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = (opt == crossfade), onClick = null)
+                            Spacer(modifier = Modifier.width(Spacing.M))
+                            Text(labelText)
+                        }
+                    }
+                }
+            },
+            confirmButton = {}
+        )
+    }
+
+    // 4. Audio Quality Dialog
+    if (showAudioQualityDialog) {
+        AlertDialog(
+            onDismissRequest = { showAudioQualityDialog = false },
+            title = { Text("Streaming Audio Quality") },
+            text = {
+                val options = listOf(
+                    "Normal (160 kbps)" to "Uses less mobile data",
+                    "High (256 kbps)" to "Recommended for high-fidelity audio",
+                    "Very High (320 kbps)" to "Maximum clarity (uses more data)"
+                )
+                Column(Modifier.selectableGroup()) {
+                    options.forEach { (opt, desc) ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .selectable(
+                                    selected = (opt == audioQuality),
+                                    onClick = {
+                                        viewModel.setAudioQuality(opt)
+                                        showAudioQualityDialog = false
+                                    },
+                                    role = Role.RadioButton
+                                )
+                                .padding(vertical = Spacing.M),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = (opt == audioQuality), onClick = null)
+                            Spacer(modifier = Modifier.width(Spacing.M))
+                            Column {
+                                Text(opt, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                                Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {}
+        )
+    }
+
+    // 5. Equalizer Dialog
+    if (showEqualizerDialog) {
+        AlertDialog(
+            onDismissRequest = { showEqualizerDialog = false },
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Graphic Equalizer", fontWeight = FontWeight.Bold)
+                    Switch(
+                        checked = equalizerEnabled,
+                        onCheckedChange = { viewModel.setEqualizerEnabled(it) }
+                    )
+                }
+            },
+            text = {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.M)
+                ) {
+                    item {
+                        Text("Presets", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.height(Spacing.XS))
+                        val presets = listOf("Flat", "Bass Boost", "Vocal", "Treble", "Rock", "Jazz", "Electronic")
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.S)) {
+                            items(presets.size) { idx ->
+                                val p = presets[idx]
+                                FilterChip(
+                                    selected = (p == equalizerPreset),
+                                    onClick = { viewModel.applyEqualizerPreset(p) },
+                                    label = { Text(p) }
+                                )
+                            }
+                        }
+                    }
+
+                    item {
+                        Text("Frequency Bands (-12dB to +12dB)", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                    }
+
+                    // 60 Hz Band
+                    item {
+                        Column {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("60 Hz", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text(String.format("%.1f dB", eqBand60Hz), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            }
+                            Slider(
+                                value = eqBand60Hz,
+                                onValueChange = { viewModel.setEqBand60Hz(it) },
+                                valueRange = -12f..12f,
+                                enabled = equalizerEnabled
+                            )
+                        }
+                    }
+
+                    // 230 Hz Band
+                    item {
+                        Column {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("230 Hz", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text(String.format("%.1f dB", eqBand230Hz), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            }
+                            Slider(
+                                value = eqBand230Hz,
+                                onValueChange = { viewModel.setEqBand230Hz(it) },
+                                valueRange = -12f..12f,
+                                enabled = equalizerEnabled
+                            )
+                        }
+                    }
+
+                    // 910 Hz Band
+                    item {
+                        Column {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("910 Hz", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text(String.format("%.1f dB", eqBand910Hz), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            }
+                            Slider(
+                                value = eqBand910Hz,
+                                onValueChange = { viewModel.setEqBand910Hz(it) },
+                                valueRange = -12f..12f,
+                                enabled = equalizerEnabled
+                            )
+                        }
+                    }
+
+                    // 4 kHz Band
+                    item {
+                        Column {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("4 kHz", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text(String.format("%.1f dB", eqBand4kHz), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            }
+                            Slider(
+                                value = eqBand4kHz,
+                                onValueChange = { viewModel.setEqBand4kHz(it) },
+                                valueRange = -12f..12f,
+                                enabled = equalizerEnabled
+                            )
+                        }
+                    }
+
+                    // 14 kHz Band
+                    item {
+                        Column {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("14 kHz", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text(String.format("%.1f dB", eqBand14kHz), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            }
+                            Slider(
+                                value = eqBand14kHz,
+                                onValueChange = { viewModel.setEqBand14kHz(it) },
+                                valueRange = -12f..12f,
+                                enabled = equalizerEnabled
+                            )
+                        }
+                    }
+
+                    item {
+                        HorizontalDivider(modifier = Modifier.padding(vertical = Spacing.S))
+                        Text("Audio Enhancements", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                    }
+
+                    item {
+                        Column {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Bass Boost", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("${eqBassBoost.toInt()}%", style = MaterialTheme.typography.bodySmall)
+                            }
+                            Slider(
+                                value = eqBassBoost,
+                                onValueChange = { viewModel.setEqBassBoost(it) },
+                                valueRange = 0f..100f,
+                                enabled = equalizerEnabled
+                            )
+                        }
+                    }
+
+                    item {
+                        Column {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("3D Surround", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                                Text("${eq3dSurround.toInt()}%", style = MaterialTheme.typography.bodySmall)
+                            }
+                            Slider(
+                                value = eq3dSurround,
+                                onValueChange = { viewModel.setEq3dSurround(it) },
+                                valueRange = 0f..100f,
+                                enabled = equalizerEnabled
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showEqualizerDialog = false }) {
+                    Text("Done")
+                }
+            }
+        )
+    }
+
+    // 6. Download Quality Dialog
+    if (showDownloadQualityDialog) {
+        AlertDialog(
+            onDismissRequest = { showDownloadQualityDialog = false },
+            title = { Text("Download Quality") },
+            text = {
+                val options = listOf("Normal (160 kbps)", "High (256 kbps)", "Very High (320 kbps)")
+                Column(Modifier.selectableGroup()) {
+                    options.forEach { opt ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .selectable(
+                                    selected = (opt == downloadQuality),
+                                    onClick = {
+                                        viewModel.setDownloadQuality(opt)
+                                        showDownloadQualityDialog = false
+                                    },
+                                    role = Role.RadioButton
+                                )
+                                .padding(vertical = Spacing.S),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = (opt == downloadQuality), onClick = null)
+                            Spacer(modifier = Modifier.width(Spacing.M))
+                            Text(opt)
+                        }
+                    }
+                }
+            },
+            confirmButton = {}
+        )
+    }
+
+    // 7. Clear History Dialog
+    if (showClearHistoryDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearHistoryDialog = false },
+            title = { Text("Clear Listening History?") },
+            text = { Text("This will permanently remove all recently played tracks and search history from local storage.") },
+            confirmButton = {
+                Button(onClick = {
+                    viewModel.clearListeningHistory {
+                        showClearHistoryDialog = false
+                        showToast("Listening history cleared successfully.")
+                    }
+                }) {
+                    Text("Clear")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearHistoryDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // 8. Open Source Licenses Dialog
+    if (showLicensesDialog) {
+        AlertDialog(
+            onDismissRequest = { showLicensesDialog = false },
+            title = { Text("Open Source Licenses") },
+            text = {
+                Column {
+                    Text("Aurora Music uses the following open source software:", style = MaterialTheme.typography.bodySmall)
+                    Spacer(modifier = Modifier.height(Spacing.M))
+                    Text("• Jetpack Compose (Apache 2.0)")
+                    Text("• Kotlin Coroutines & Flow (Apache 2.0)")
+                    Text("• Room Database (Apache 2.0)")
+                    Text("• Retrofit & OkHttp (Apache 2.0)")
+                    Text("• Coil Image Loading (Apache 2.0)")
+                    Text("• YouTube Data API v3")
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLicensesDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
+
+    // 9. Playback Diagnostics Dialog
+    if (showDiagnosticsDialog) {
+        val diagSong by com.example.playback.AudioPlayerManager.currentSong.collectAsStateWithLifecycle()
+        val diagIsPlaying by com.example.playback.AudioPlayerManager.isPlaying.collectAsStateWithLifecycle()
+        val diagIsBuffering by com.example.playback.AudioPlayerManager.isBuffering.collectAsStateWithLifecycle()
+        val diagPosMs by com.example.playback.AudioPlayerManager.positionMs.collectAsStateWithLifecycle()
+        val diagDurMs by com.example.playback.AudioPlayerManager.durationMs.collectAsStateWithLifecycle()
+        val diagStateName by com.example.playback.AudioPlayerManager.playerStateName.collectAsStateWithLifecycle()
+        val diagAudioFocus by com.example.playback.AudioPlayerManager.audioFocusState.collectAsStateWithLifecycle()
+        val diagVol by com.example.playback.AudioPlayerManager.volume.collectAsStateWithLifecycle()
+        val diagErr by com.example.playback.AudioPlayerManager.errorMessage.collectAsStateWithLifecycle()
+        val diagLog by com.example.playback.AudioPlayerManager.lastDiagnosticLog.collectAsStateWithLifecycle()
+
+        AlertDialog(
+            onDismissRequest = { showDiagnosticsDialog = false },
+            title = { Text("Playback Diagnostics", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.S)
+                ) {
+                    Text("• Current Track: ${diagSong?.title ?: "None"}", style = MaterialTheme.typography.bodySmall)
+                    Text("• Artist: ${diagSong?.artist ?: "N/A"}", style = MaterialTheme.typography.bodySmall)
+                    Text("• Stream URL: ${diagSong?.streamUrl?.takeIf { it.isNotBlank() } ?: "Mapped/Default"}", style = MaterialTheme.typography.bodySmall)
+                    Text("• Player State: $diagStateName", style = MaterialTheme.typography.bodySmall)
+                    Text("• Is Playing: $diagIsPlaying | Buffering: $diagIsBuffering", style = MaterialTheme.typography.bodySmall)
+                    Text("• Position / Duration: ${diagPosMs / 1000}s / ${diagDurMs / 1000}s", style = MaterialTheme.typography.bodySmall)
+                    Text("• Volume: ${(diagVol * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
+                    Text("• Audio Focus: $diagAudioFocus", style = MaterialTheme.typography.bodySmall)
+                    if (diagErr != null) {
+                        Text("• Last Error: $diagErr", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    }
+                    Text("• Diagnostic Log: $diagLog", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showDiagnosticsDialog = false }) {
+                    Text("Close")
+                }
+            }
+        )
+    }
 }
+
 
 @Composable
 fun SettingsCategory(title: String) {
