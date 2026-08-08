@@ -101,31 +101,33 @@ object AudioPlayerManager : Player.Listener {
         _currentSong.value = song
         _errorMessage.value = null
 
+        // Pre-playback validation
+        if (song.id.isBlank() || song.title.isBlank() || song.artist.isBlank()) {
+            player.stop()
+            _isPlaying.value = false
+            _isBuffering.value = false
+            _playerStateName.value = "Unavailable"
+            _errorMessage.value = "Audio unavailable."
+            _lastDiagnosticLog.value = "Pre-playback validation failed: Incomplete track metadata."
+            return
+        }
+
+        val playableUri = resolvePlayableUri(song)
+        if (playableUri == null) {
+            player.stop()
+            _isPlaying.value = false
+            _isBuffering.value = false
+            _playerStateName.value = "Unavailable"
+            _errorMessage.value = "Playback unavailable for this track."
+            _lastDiagnosticLog.value = "Audio unavailable: Missing or invalid playable audio URL for track '${song.title}' (ID: ${song.id})."
+            return
+        }
+
         scope.launch {
-            var finalStreamUrl = song.streamUrl
-            if (finalStreamUrl.startsWith("https://www.youtube.com/watch?v=")) {
-                val videoId = song.id
-                _isBuffering.value = true
-                _lastDiagnosticLog.value = "Fetching YouTube audio stream for $videoId..."
-                val streamUrl = com.example.data.YTMusicRepository().getStreamUrlForVideo(videoId)
-                if (!streamUrl.isNullOrBlank()) {
-                    finalStreamUrl = streamUrl
-                }
-            }
-
-            val playableSong = song.copy(streamUrl = finalStreamUrl)
-            val playableUri = resolvePlayableUri(playableSong)
-            if (playableUri == null) {
-                player.stop()
-                _isPlaying.value = false
-                _isBuffering.value = false
-                _playerStateName.value = "IDLE"
-                _errorMessage.value = "Audio stream unavailable for this track."
-                _lastDiagnosticLog.value = "Audio unavailable: Missing or invalid playable URI for track '${song.title}' (ID: ${song.id})."
-                return@launch
-            }
-
             try {
+                _isBuffering.value = true
+                _playerStateName.value = "Loading"
+
                 val mediaMetadata = MediaMetadata.Builder()
                     .setTitle(song.title)
                     .setArtist(song.artist.ifEmpty { "Unknown Artist" })
@@ -147,6 +149,8 @@ object AudioPlayerManager : Player.Listener {
                 startProgressTracker()
             } catch (e: Exception) {
                 _isPlaying.value = false
+                _isBuffering.value = false
+                _playerStateName.value = "Error"
                 _errorMessage.value = "Playback error: ${e.message}"
                 _lastDiagnosticLog.value = "Exception initializing MediaItem: ${e.message}"
             }
@@ -247,6 +251,11 @@ object AudioPlayerManager : Player.Listener {
     // Player.Listener Callbacks - Real ExoPlayer state is single source of truth
     override fun onIsPlayingChanged(isPlaying: Boolean) {
         _isPlaying.value = isPlaying
+        if (isPlaying) {
+            _playerStateName.value = "Playing"
+        } else if (exoPlayer?.playbackState == Player.STATE_READY) {
+            _playerStateName.value = "Paused"
+        }
         _lastDiagnosticLog.value = if (isPlaying) "ExoPlayer Event: Playing (Audible)" else "ExoPlayer Event: Paused / Idle"
     }
 
@@ -257,21 +266,21 @@ object AudioPlayerManager : Player.Listener {
                 _isBuffering.value = false
             }
             Player.STATE_BUFFERING -> {
-                _playerStateName.value = "BUFFERING"
+                _playerStateName.value = "Loading"
                 _isBuffering.value = true
                 _lastDiagnosticLog.value = "ExoPlayer: Buffering audio stream..."
             }
             Player.STATE_READY -> {
-                _playerStateName.value = "READY"
                 _isBuffering.value = false
+                _playerStateName.value = if (exoPlayer?.isPlaying == true) "Playing" else "Paused"
                 val dur = exoPlayer?.duration ?: 0L
                 if (dur > 0) {
                     _durationMs.value = dur
                 }
-                _lastDiagnosticLog.value = "ExoPlayer: Ready to play. Duration: ${dur / 1000}s"
+                _lastDiagnosticLog.value = "ExoPlayer: Ready. Duration: ${dur / 1000}s"
             }
             Player.STATE_ENDED -> {
-                _playerStateName.value = "ENDED"
+                _playerStateName.value = "Completed"
                 _isBuffering.value = false
                 _isPlaying.value = false
                 _lastDiagnosticLog.value = "ExoPlayer: Track ended."
@@ -282,12 +291,26 @@ object AudioPlayerManager : Player.Listener {
     override fun onPlayerError(error: PlaybackException) {
         _isPlaying.value = false
         _isBuffering.value = false
-        _playerStateName.value = "ERROR"
+        _playerStateName.value = "Error"
         
         val curr = _currentSong.value
-        val errStr = "Playback error [Code ${error.errorCode}]: ${error.message ?: "Media source unreachable"}"
-        _errorMessage.value = errStr
-        _lastDiagnosticLog.value = "ERROR for Track '${curr?.title}' (ID: ${curr?.id}): $errStr"
+        val msg = error.message ?: ""
+        val code = error.errorCode
+
+        val specificMessage = when {
+            msg.contains("451") || code == 451 -> "This track isn't available for playback in your region."
+            msg.contains("403") || code == 403 -> "Playback is unavailable for this track."
+            msg.contains("404") -> "HTTP error 404: Audio stream not found."
+            code == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED || msg.contains("Unable to resolve host") || msg.contains("No address associated") -> "You're offline."
+            code == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> "Network connection timeout."
+            code == PlaybackException.ERROR_CODE_IO_FILE_NOT_FOUND -> "Audio file source not found."
+            code == PlaybackException.ERROR_CODE_IO_NO_PERMISSION -> "Permission denied accessing audio source."
+            code == PlaybackException.ERROR_CODE_DECODER_INIT_FAILED -> "Audio decoder initialization failed."
+            else -> if (msg.isNotBlank() && !msg.contains("Source error")) msg else "Unable to play this track."
+        }
+
+        _errorMessage.value = specificMessage
+        _lastDiagnosticLog.value = "ERROR for Track '${curr?.title}' (ID: ${curr?.id}): $specificMessage"
     }
 
     fun release() {

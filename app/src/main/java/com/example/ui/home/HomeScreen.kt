@@ -1,6 +1,5 @@
 package com.example.ui.home
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -15,11 +14,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
@@ -28,19 +25,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.model.Song
 import com.example.ui.components.AuroraMusicCard
-import com.example.ui.components.GenreGridCard
 import com.example.ui.components.SkeletonMusicCard
-import com.example.ui.components.SkeletonSongListItem
 import com.example.ui.search.SongListItem
 import com.example.ui.state.UiState
 import com.example.ui.theme.LocalAppDensity
@@ -65,7 +63,7 @@ fun HomeScreen(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 120.dp)
     ) {
-        // TOP APP BAR
+        // 1. GREETING / HEADER
         item {
             Column(modifier = Modifier.padding(horizontal = Spacing.XL, vertical = Spacing.M)) {
                 Row(
@@ -73,26 +71,34 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Aurora Music",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
+                    Column {
+                        Text(
+                            text = "Namaste, Music Lover",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Aurora Music",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
 
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         HeaderIconButton(
+                            icon = Icons.Rounded.Refresh,
+                            contentDescription = "Refresh Home",
+                            onClick = { viewModel.loadHomeData() }
+                        )
+                        HeaderIconButton(
                             icon = Icons.Outlined.History,
                             contentDescription = "Listening History",
                             onClick = onNavigateToHistory
-                        )
-                        HeaderIconButton(
-                            icon = Icons.Outlined.TrendingUp,
-                            contentDescription = "Trending",
-                            onClick = { viewModel.loadHomeData("Trending") }
                         )
                         HeaderIconButton(
                             icon = Icons.Outlined.Person,
@@ -131,7 +137,7 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.width(Spacing.M))
                         Text(
-                            text = "Search songs, artists, playlists...",
+                            text = "Search Indian songs, artists, albums...",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -149,24 +155,14 @@ fun HomeScreen(
             ) {
                 items(viewModel.moodChips) { mood ->
                     val isSelected = selectedMood == mood
-                    val chipBg = if (isSelected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    }
-                    val chipText = if (isSelected) {
-                        MaterialTheme.colorScheme.onPrimary
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    }
+                    val chipBg = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+                    val chipText = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
 
                     Surface(
                         onClick = { viewModel.selectMood(mood) },
                         shape = RoundedCornerShape(20.dp),
                         color = chipBg,
-                        border = if (!isSelected) {
-                            androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
-                        } else null,
+                        border = if (!isSelected) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)) else null,
                         modifier = Modifier
                             .height(density.chipHeight)
                             .testTag("mood_chip_${mood.lowercase()}")
@@ -188,220 +184,325 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(Spacing.L))
         }
 
-        // HERO SECTION: MUSIC THAT'S HOT AND HAPPENING!
-        item {
-            Column(modifier = Modifier.padding(horizontal = Spacing.XL)) {
-                Text(
-                    text = "MUSIC THAT'S HOT AND HAPPENING!",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.2.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "Top Global Hits",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-            }
-
-            Spacer(modifier = Modifier.height(Spacing.M))
-
-            val biggestHits = (homeState as? UiState.Success)?.data?.biggestHitsCards ?: emptyList()
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = Spacing.XL),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.L)
-            ) {
-                if (biggestHits.isEmpty()) {
-                    items(4) { SkeletonMusicCard() }
-                } else {
-                    items(biggestHits) { cardItem ->
-                        AuroraMusicCard(
-                            title = cardItem.title,
-                            artist = cardItem.artist,
-                            imageUrl = cardItem.imageUrl,
-                            badgeText = cardItem.badge,
-                            onClick = { onSongClick(cardItem.song) },
-                            onMoreClick = { selectedSongForOptions = cardItem.song }
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(Spacing.XXL))
-        }
-
-        // MOOD AND GENRES SECTION
-        item {
-            val selectedGenre = (homeState as? UiState.Success)?.data?.selectedGenre
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.XL),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Mood and Genres",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                IconButton(onClick = { onNavigateToSearch() }) {
-                    Icon(
-                        imageVector = Icons.Outlined.ArrowForward,
-                        contentDescription = "See All Genres",
-                        tint = MaterialTheme.colorScheme.onBackground
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(Spacing.M))
-
-            // 3-column grid for genres
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.XL),
-                verticalArrangement = Arrangement.spacedBy(Spacing.M)
-            ) {
-                val genreChunks = viewModel.genres.chunked(3)
-                genreChunks.forEach { rowGenres ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.M)
-                    ) {
-                        rowGenres.forEach { genre ->
-                            GenreGridCard(
-                                name = genre,
-                                isSelected = selectedGenre == genre,
-                                onClick = { viewModel.selectGenre(genre) },
-                                modifier = Modifier.weight(1f)
-                            )
+        when (val state = homeState) {
+            is UiState.Loading -> {
+                item {
+                    Column(modifier = Modifier.padding(horizontal = Spacing.XL)) {
+                        Text(text = "Loading Indian Music...", style = MaterialTheme.typography.titleMedium)
+                        Spacer(modifier = Modifier.height(Spacing.M))
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.L)) {
+                            items(4) { SkeletonMusicCard() }
                         }
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(Spacing.XXL))
-        }
-
-        // DANCING HITS SECTION
-        item {
-            Column(modifier = Modifier.padding(horizontal = Spacing.XL)) {
-                Text(
-                    text = "DANCE YOUR STRESS AWAY",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.2.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "Dancing Hits",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-            }
-
-            Spacer(modifier = Modifier.height(Spacing.M))
-
-            val dancingHits = (homeState as? UiState.Success)?.data?.dancingHitsCards ?: emptyList()
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = Spacing.XL),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.L)
-            ) {
-                if (dancingHits.isEmpty()) {
-                    items(3) { SkeletonMusicCard() }
-                } else {
-                    items(dancingHits) { cardItem ->
-                        AuroraMusicCard(
-                            title = cardItem.title,
-                            artist = cardItem.artist,
-                            imageUrl = cardItem.imageUrl,
-                            badgeText = cardItem.badge,
-                            onClick = { onSongClick(cardItem.song) },
-                            onMoreClick = { selectedSongForOptions = cardItem.song }
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(Spacing.XXL))
-        }
-
-        // RECOMMENDED TRACKS LIST
-        item {
-            Text(
-                text = "Recommended for You",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.padding(horizontal = Spacing.XL, vertical = Spacing.S)
-            )
-        }
-
-        when (val state = homeState) {
-            is UiState.Loading -> items(6) { SkeletonSongListItem() }
-            is UiState.Success -> items(state.data.categorySongs) { song ->
-                SongListItem(
-                    song = song,
-                    onClick = { onSongClick(song) },
-                    onInfoClick = { selectedSongForOptions = song }
-                )
-            }
-            is UiState.Error -> item {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.XL, vertical = Spacing.L),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
-                    )
-                ) {
-                    Column(
+            is UiState.Error -> {
+                item {
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(Spacing.L),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .padding(horizontal = Spacing.XL, vertical = Spacing.L),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f))
                     ) {
-                        Text(
-                            text = state.message,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.error,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(Spacing.M))
-                        Button(
-                            onClick = { viewModel.retry() },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary
-                            )
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(Spacing.L),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Icon(
-                                imageVector = Icons.Rounded.Refresh,
-                                contentDescription = "Retry",
-                                modifier = Modifier.size(18.dp)
+                            Text(
+                                text = state.message,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.error,
+                                textAlign = TextAlign.Center
                             )
-                            Spacer(modifier = Modifier.width(Spacing.S))
-                            Text("Retry")
+                            Spacer(modifier = Modifier.height(Spacing.M))
+                            Button(onClick = { viewModel.retry() }) {
+                                Icon(Icons.Rounded.Refresh, contentDescription = "Retry", modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(Spacing.S))
+                                Text("Retry")
+                            }
                         }
                     }
                 }
             }
-            is UiState.Empty -> item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(Spacing.XL),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "No music found.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+            is UiState.Empty -> {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(Spacing.XXL), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("No music available right now.", style = MaterialTheme.typography.bodyLarge)
+                            Spacer(modifier = Modifier.height(Spacing.M))
+                            Button(onClick = { viewModel.retry() }) {
+                                Text("Retry")
+                            }
+                        }
+                    }
+                }
+            }
+            is UiState.Success -> {
+                val data = state.data
+
+                // 2. INDIAN TRENDING
+                item {
+                    HomeSectionHeader(subtitle = "TRENDING NOW", title = "Indian Trending")
+                    Spacer(modifier = Modifier.height(Spacing.M))
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = Spacing.XL),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.L)
+                    ) {
+                        items(data.indianTrending) { song ->
+                            AuroraMusicCard(
+                                title = song.title,
+                                artist = song.artist,
+                                imageUrl = song.artworkUrl,
+                                badgeText = "TRENDING",
+                                onClick = { onSongClick(song) },
+                                onMoreClick = { selectedSongForOptions = song }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(Spacing.XXL))
+                }
+
+                // 3. POPULAR IN INDIA
+                item {
+                    HomeSectionHeader(subtitle = "TOP CHARTS", title = "Popular in India")
+                    Spacer(modifier = Modifier.height(Spacing.M))
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = Spacing.XL),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.L)
+                    ) {
+                        items(data.popularInIndia) { song ->
+                            AuroraMusicCard(
+                                title = song.title,
+                                artist = song.artist,
+                                imageUrl = song.artworkUrl,
+                                badgeText = "POPULAR",
+                                onClick = { onSongClick(song) },
+                                onMoreClick = { selectedSongForOptions = song }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(Spacing.XXL))
+                }
+
+                // 4. HINDI HITS
+                item {
+                    HomeSectionHeader(subtitle = "CURATED HITS", title = "Hindi Hits")
+                    Spacer(modifier = Modifier.height(Spacing.M))
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = Spacing.XL),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.L)
+                    ) {
+                        items(data.hindiHits) { song ->
+                            AuroraMusicCard(
+                                title = song.title,
+                                artist = song.artist,
+                                imageUrl = song.artworkUrl,
+                                badgeText = "HINDI",
+                                onClick = { onSongClick(song) },
+                                onMoreClick = { selectedSongForOptions = song }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(Spacing.XXL))
+                }
+
+                // 5. PUNJABI HITS
+                item {
+                    HomeSectionHeader(subtitle = "CLUB ANTHEMS", title = "Punjabi Hits")
+                    Spacer(modifier = Modifier.height(Spacing.M))
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = Spacing.XL),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.L)
+                    ) {
+                        items(data.punjabiHits) { song ->
+                            AuroraMusicCard(
+                                title = song.title,
+                                artist = song.artist,
+                                imageUrl = song.artworkUrl,
+                                badgeText = "PUNJABI",
+                                onClick = { onSongClick(song) },
+                                onMoreClick = { selectedSongForOptions = song }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(Spacing.XXL))
+                }
+
+                // 6. BOLLYWOOD / INDIAN FILM MUSIC
+                item {
+                    HomeSectionHeader(subtitle = "SOUNDTRACKS & FILMS", title = "Bollywood / Indian Film Music")
+                    Spacer(modifier = Modifier.height(Spacing.M))
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = Spacing.XL),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.L)
+                    ) {
+                        items(data.bollywoodMusic) { song ->
+                            AuroraMusicCard(
+                                title = song.title,
+                                artist = song.artist,
+                                imageUrl = song.artworkUrl,
+                                badgeText = "BOLLYWOOD",
+                                onClick = { onSongClick(song) },
+                                onMoreClick = { selectedSongForOptions = song }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(Spacing.XXL))
+                }
+
+                // 7. INDIAN ARTISTS
+                item {
+                    HomeSectionHeader(subtitle = "TOP CREATORS", title = "Indian Artists")
+                    Spacer(modifier = Modifier.height(Spacing.M))
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = Spacing.XL),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.L)
+                    ) {
+                        items(data.indianArtists) { artist ->
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .width(110.dp)
+                                    .clickable {}
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(110.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), CircleShape)
+                                ) {
+                                    AsyncImage(
+                                        model = artist.image.ifEmpty { "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300" },
+                                        contentDescription = artist.name,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = artist.name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(Spacing.XXL))
+                }
+
+                // 8. INDIAN ALBUMS
+                item {
+                    HomeSectionHeader(subtitle = "FEATURED RELEASES", title = "Indian Albums")
+                    Spacer(modifier = Modifier.height(Spacing.M))
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = Spacing.XL),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.L)
+                    ) {
+                        items(data.indianAlbums) { album ->
+                            Column(
+                                modifier = Modifier
+                                    .width(140.dp)
+                                    .clickable {}
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(140.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                                ) {
+                                    AsyncImage(
+                                        model = album.artwork.ifEmpty { "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300" },
+                                        contentDescription = album.title,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = album.title,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(Spacing.XXL))
+                }
+
+                // 9. RECENTLY PLAYED
+                item {
+                    HomeSectionHeader(subtitle = "HISTORY", title = "Recently Played")
+                    Spacer(modifier = Modifier.height(Spacing.M))
+                }
+                items(data.recentlyPlayed) { song ->
+                    Box(modifier = Modifier.padding(horizontal = Spacing.XL)) {
+                        SongListItem(
+                            song = song,
+                            onClick = { onSongClick(song) },
+                            onInfoClick = { selectedSongForOptions = song }
+                        )
+                    }
+                }
+                item { Spacer(modifier = Modifier.height(Spacing.XXL)) }
+
+                // 10. YOUR PLAYLISTS
+                item {
+                    HomeSectionHeader(subtitle = "CURATED FOR YOU", title = "Your Playlists")
+                    Spacer(modifier = Modifier.height(Spacing.M))
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = Spacing.XL),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.L)
+                    ) {
+                        items(data.userPlaylists) { playlist ->
+                            Card(
+                                onClick = {},
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                modifier = Modifier
+                                    .width(180.dp)
+                                    .height(140.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(Spacing.M),
+                                    verticalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.MusicNote,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Column {
+                                        Text(
+                                            text = playlist.title,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = playlist.description ?: "",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(Spacing.XXL))
                 }
             }
         }
@@ -416,6 +517,25 @@ fun HomeScreen(
                 onSongClick(song)
                 selectedSongForOptions = null
             }
+        )
+    }
+}
+
+@Composable
+private fun HomeSectionHeader(subtitle: String, title: String) {
+    Column(modifier = Modifier.padding(horizontal = Spacing.XL)) {
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.2.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = title,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
         )
     }
 }

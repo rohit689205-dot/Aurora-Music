@@ -47,7 +47,7 @@ class YTMusicRepository {
             return@flow
         }
 
-        try {
+        val result = try {
             // First search on JioSaavn for high quality audio & rich metadata
             val saavnResp = JioSaavnApiClient.apiService.searchSongs(query = trimmed, limit = 15)
             val saavnSongs = mutableListOf<Song>()
@@ -94,8 +94,10 @@ class YTMusicRepository {
                 ytSongs.addAll(parsedYtSongs)
             }
 
-            // Combine JioSaavn + YT Music songs (distinct by title/artist)
-            val combinedSongs = (saavnSongs + ytSongs).distinctBy { "${it.title.lowercase()}_${it.artist.lowercase()}" }
+            // Combine JioSaavn + YT Music songs (require non-blank stream URL)
+            val combinedSongs = (ytSongs + saavnSongs)
+                .filter { it.streamUrl.isNotBlank() }
+                .distinctBy { "${it.title.lowercase()}_${it.artist.lowercase()}" }
 
             // Extract Artists & Albums dynamically
             val artists = combinedSongs.map { it.artist }.distinct().take(5).map { artistName ->
@@ -118,21 +120,21 @@ class YTMusicRepository {
                 )
             }
 
-            emit(
-                Result.success(
-                    YTMusicSearchResult(
-                        songs = combinedSongs,
-                        artists = artists,
-                        albums = albums,
-                        playlists = emptyList()
-                    )
+            Result.success(
+                YTMusicSearchResult(
+                    songs = combinedSongs,
+                    artists = artists,
+                    albums = albums,
+                    playlists = emptyList()
                 )
             )
 
         } catch (e: Exception) {
             Log.e("YTMusicRepository", "Search error", e)
-            emit(Result.failure(e))
+            Result.failure(e)
         }
+
+        emit(result)
     }
 
     suspend fun getStreamUrlForVideo(videoId: String): String? {
@@ -231,7 +233,7 @@ class YTMusicRepository {
                                 album = album,
                                 duration = 210000L,
                                 artworkUrl = thumbUrl,
-                                streamUrl = "https://www.youtube.com/watch?v=$videoId"
+                                streamUrl = ""
                             )
                         )
                     }

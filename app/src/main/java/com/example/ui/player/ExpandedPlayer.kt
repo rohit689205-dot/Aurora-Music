@@ -50,6 +50,7 @@ fun ExpandedPlayer(
     val isShuffle by playerViewModel.isShuffleEnabled.collectAsStateWithLifecycle()
     val repeatMode by playerViewModel.repeatMode.collectAsStateWithLifecycle()
     val userPlaylists by playerViewModel.userPlaylists.collectAsStateWithLifecycle()
+    val errorMessage by playerViewModel.errorMessage.collectAsStateWithLifecycle()
 
     var showPlaylistSheet by remember { mutableStateOf(false) }
     var showCreatePlaylistDialog by remember { mutableStateOf(false) }
@@ -165,6 +166,53 @@ fun ExpandedPlayer(
                         tint = if (isFavorite) Color.Red else MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.size(28.dp)
                     )
+                }
+            }
+
+            if (errorMessage != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = errorMessage ?: "",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            val is451 = errorMessage?.contains("region") == true || errorMessage?.contains("451") == true
+                            if (is451) {
+                                Button(
+                                    onClick = onNext,
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Choose Another Track")
+                                }
+                            } else {
+                                Button(
+                                    onClick = onNext,
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Try Another Track")
+                                }
+                                OutlinedButton(
+                                    onClick = { playerViewModel.playSong(song) },
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text("Retry")
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
