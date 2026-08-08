@@ -11,9 +11,6 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +21,7 @@ import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -43,8 +41,7 @@ import com.example.ui.components.AuroraMusicCard
 import com.example.ui.components.GenreGridCard
 import com.example.ui.components.SkeletonMusicCard
 import com.example.ui.components.SkeletonSongListItem
-import com.example.ui.components.SongListItem
-import com.example.ui.search.YouTubeSongListItem
+import com.example.ui.search.SongListItem
 import com.example.ui.state.UiState
 import com.example.ui.theme.LocalAppDensity
 import com.example.ui.theme.Spacing
@@ -56,7 +53,7 @@ fun HomeScreen(
     onNavigateToHistory: () -> Unit = {},
     onNavigateToProfile: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
-    viewModel: YouTubeHomeViewModel = viewModel(),
+    viewModel: HomeViewModel = viewModel(),
     modifier: Modifier = Modifier
 ) {
     val homeState by viewModel.homeState.collectAsStateWithLifecycle()
@@ -191,7 +188,7 @@ fun HomeScreen(
             Spacer(modifier = Modifier.height(Spacing.L))
         }
 
-        // HERO SECTION: MUSIC THAT'S HOT AND HAPPENING! -> India's Biggest Hits
+        // HERO SECTION: MUSIC THAT'S HOT AND HAPPENING!
         item {
             Column(modifier = Modifier.padding(horizontal = Spacing.XL)) {
                 Text(
@@ -202,7 +199,7 @@ fun HomeScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "India's Biggest Hits",
+                    text = "Top Global Hits",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground
@@ -348,13 +345,65 @@ fun HomeScreen(
         when (val state = homeState) {
             is UiState.Loading -> items(6) { SkeletonSongListItem() }
             is UiState.Success -> items(state.data.categorySongs) { song ->
-                YouTubeSongListItem(
+                SongListItem(
                     song = song,
                     onClick = { onSongClick(song) },
                     onInfoClick = { selectedSongForOptions = song }
                 )
             }
-            else -> item {}
+            is UiState.Error -> item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.XL, vertical = Spacing.L),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(Spacing.L),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = state.message,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(Spacing.M))
+                        Button(
+                            onClick = { viewModel.retry() },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Refresh,
+                                contentDescription = "Retry",
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(Spacing.S))
+                            Text("Retry")
+                        }
+                    }
+                }
+            }
+            is UiState.Empty -> item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(Spacing.XL),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "No music found.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
     }
 
@@ -457,4 +506,3 @@ fun SongOptionsBottomSheet(
         }
     }
 }
-

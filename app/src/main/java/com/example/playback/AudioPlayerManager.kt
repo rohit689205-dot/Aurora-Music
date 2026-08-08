@@ -1,18 +1,17 @@
 package com.example.playback
 
 import android.content.Context
-import android.media.AudioAttributes
-import android.media.AudioFocusRequest
-import android.media.AudioManager
 import android.net.Uri
-import android.os.Build
 import androidx.media3.common.AudioAttributes as Media3AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.example.model.Song
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -61,14 +60,8 @@ object AudioPlayerManager : Player.Listener {
 
     private var progressTrackerJob: Job? = null
 
-    // Sample fallback streams for YouTube metadata items (which don't provide raw stream URLs via YouTube Data API v3)
-    private val fallbackStreams = listOf(
-        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
-        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
-        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
-        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
-        "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3"
-    )
+    // Known authorized direct audio stream for developer/diagnostic test
+    const val OFFICIAL_TEST_AUDIO_URI = "https://storage.googleapis.com/exoplayer-test-media-0/play.mp3"
 
     fun getOrCreatePlayer(context: Context): ExoPlayer {
         val appContext = context.applicationContext
@@ -80,14 +73,25 @@ object AudioPlayerManager : Player.Listener {
                 .setUsage(C.USAGE_MEDIA)
                 .build()
 
+            val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+                .setUserAgent("AuroraMusic/1.0 (Android ExoPlayer)")
+                .setAllowCrossProtocolRedirects(true)
+                .setConnectTimeoutMs(15000)
+                .setReadTimeoutMs(15000)
+
+            val dataSourceFactory = DefaultDataSource.Factory(appContext, httpDataSourceFactory)
+            val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+
             exoPlayer = ExoPlayer.Builder(appContext)
-                .setAudioAttributes(audioAttributes, true)
+                .setMediaSourceFactory(mediaSourceFactory)
+                .setAudioAttributes(audioAttributes, true) // Handles audio focus automatically
                 .setHandleAudioBecomingNoisy(true)
                 .build()
                 .apply {
                     addListener(this@AudioPlayerManager)
+                    volume = _volume.value
                 }
-            _lastDiagnosticLog.value = "ExoPlayer created successfully."
+            _lastDiagnosticLog.value = "ExoPlayer initialized with music AudioAttributes."
         }
         return exoPlayer!!
     }
@@ -97,77 +101,121 @@ object AudioPlayerManager : Player.Listener {
         _currentSong.value = song
         _errorMessage.value = null
 
-        val playableUri = resolvePlayableUri(song)
-        if (playableUri == null) {
-            _errorMessage.value = "Audio playback is unavailable for this track."
-            _lastDiagnosticLog.value = "Failed: No playable URL for ${song.title}"
-            _isPlaying.value = false
-            return
-        }
+        scope.launch {
+            var finalStreamUrl = song.streamUrl
+            if (finalStreamUrl.startsWith("https://www.youtube.com/watch?v=")) {
+                val videoId = song.id
+                _isBuffering.value = true
+                _lastDiagnosticLog.value = "Fetching YouTube audio stream for $videoId..."
+                val streamUrl = com.example.data.YTMusicRepository().getStreamUrlForVideo(videoId)
+                if (!streamUrl.isNullOrBlank()) {
+                    finalStreamUrl = streamUrl
+                }
+            }
 
-        try {
-            val mediaMetadata = MediaMetadata.Builder()
-                .setTitle(song.title)
-                .setArtist(song.artist.ifEmpty { "Unknown Artist" })
-                .setArtworkUri(Uri.parse(song.artworkUrl))
-                .build()
+            val playableSong = song.copy(streamUrl = finalStreamUrl)
+            val playableUri = resolvePlayableUri(playableSong)
+            if (playableUri == null) {
+                player.stop()
+                _isPlaying.value = false
+                _isBuffering.value = false
+                _playerStateName.value = "IDLE"
+                _errorMessage.value = "Audio stream unavailable for this track."
+                _lastDiagnosticLog.value = "Audio unavailable: Missing or invalid playable URI for track '${song.title}' (ID: ${song.id})."
+                return@launch
+            }
 
-            val mediaItem = MediaItem.Builder()
-                .setUri(playableUri)
-                .setMediaId(song.id)
-                .setMediaMetadata(mediaMetadata)
-                .build()
+            try {
+                val mediaMetadata = MediaMetadata.Builder()
+                    .setTitle(song.title)
+                    .setArtist(song.artist.ifEmpty { "Unknown Artist" })
+                    .setArtworkUri(if (song.artworkUrl.isNotBlank()) Uri.parse(song.artworkUrl) else null)
+                    .build()
 
-            player.setMediaItem(mediaItem)
-            player.prepare()
-            player.play()
+                val mediaItem = MediaItem.Builder()
+                    .setUri(playableUri)
+                    .setMediaId(song.id)
+                    .setMediaMetadata(mediaMetadata)
+                    .build()
 
-            _lastDiagnosticLog.value = "Loading audio stream: $playableUri"
-            startProgressTracker()
-        } catch (e: Exception) {
-            _errorMessage.value = "Playback error: ${e.message}"
-            _lastDiagnosticLog.value = "Exception setting MediaItem: ${e.message}"
+                _lastDiagnosticLog.value = "Loading track [ID: ${song.id}] '${song.title}' -> URI: $playableUri"
+
+                player.setMediaItem(mediaItem)
+                player.prepare()
+                player.play()
+
+                startProgressTracker()
+            } catch (e: Exception) {
+                _isPlaying.value = false
+                _errorMessage.value = "Playback error: ${e.message}"
+                _lastDiagnosticLog.value = "Exception initializing MediaItem: ${e.message}"
+            }
         }
     }
 
-    private fun resolvePlayableUri(song: Song): Uri? {
-        val url = song.streamUrl.trim()
+    /**
+     * Resolves playable URI. Returns null if URI is invalid, empty, or a non-direct web metadata URL (e.g. YouTube web links).
+     */
+    fun resolvePlayableUri(song: Song): Uri? {
         val local = song.localPath?.trim()
-
         if (!local.isNullOrEmpty()) {
             return Uri.parse(local)
         }
 
+        val url = song.streamUrl.trim()
+        if (url.startsWith("content://") || url.startsWith("file://")) {
+            return Uri.parse(url)
+        }
+
         if (url.startsWith("http://") || url.startsWith("https://")) {
-            if (url.contains("youtube.com") || url.contains("youtu.be")) {
-                // YouTube Data API metadata URL is not a direct stream. Fall back to licensed public sample stream
-                val fallback = fallbackStreams[(song.id.hashCode() and 0x7FFFFFFF) % fallbackStreams.size]
-                _lastDiagnosticLog.value = "Mapped YouTube metadata to authorized stream for ${song.title}"
-                return Uri.parse(fallback)
+            val lower = url.lowercase()
+            if (lower.contains("youtube.com/watch") || lower.contains("youtu.be/")) {
+                // Non-direct watch URL, needs stream extraction
+                return null
             }
             return Uri.parse(url)
         }
 
-        // Default fallback if no streamUrl is provided
-        val fallback = fallbackStreams[(song.id.hashCode() and 0x7FFFFFFF) % fallbackStreams.size]
-        return Uri.parse(fallback)
+        return null
+    }
+
+    /**
+     * Development / Diagnostic test player: loads and plays an authorized direct test track.
+     */
+    fun playTestTrack(context: Context, customUri: String = OFFICIAL_TEST_AUDIO_URI) {
+        val testSong = Song(
+            id = "test_track_001",
+            title = "Official Audio Test Track",
+            artist = "Google ExoPlayer Test Media",
+            album = "Authorized Diagnostic Suite",
+            duration = 60000L,
+            artworkUrl = "",
+            streamUrl = customUri
+        )
+        playSong(context, testSong)
     }
 
     fun togglePlayPause() {
         val player = exoPlayer ?: return
         if (player.isPlaying) {
             player.pause()
-            _isPlaying.value = false
-            _lastDiagnosticLog.value = "Paused playback"
+            _lastDiagnosticLog.value = "User paused playback."
         } else {
             if (player.playbackState == Player.STATE_ENDED) {
                 player.seekTo(0)
             }
             player.play()
-            _isPlaying.value = true
-            _lastDiagnosticLog.value = "Resumed playback"
+            _lastDiagnosticLog.value = "User resumed playback."
             startProgressTracker()
         }
+    }
+
+    fun stop() {
+        exoPlayer?.stop()
+        _isPlaying.value = false
+        _isBuffering.value = false
+        _playerStateName.value = "IDLE"
+        _lastDiagnosticLog.value = "Playback stopped."
     }
 
     fun seekTo(positionMs: Long) {
@@ -196,10 +244,10 @@ object AudioPlayerManager : Player.Listener {
         }
     }
 
-    // Player.Listener Callbacks
+    // Player.Listener Callbacks - Real ExoPlayer state is single source of truth
     override fun onIsPlayingChanged(isPlaying: Boolean) {
         _isPlaying.value = isPlaying
-        _lastDiagnosticLog.value = if (isPlaying) "ExoPlayer: Playing" else "ExoPlayer: Paused"
+        _lastDiagnosticLog.value = if (isPlaying) "ExoPlayer Event: Playing (Audible)" else "ExoPlayer Event: Paused / Idle"
     }
 
     override fun onPlaybackStateChanged(playbackState: Int) {
@@ -211,7 +259,7 @@ object AudioPlayerManager : Player.Listener {
             Player.STATE_BUFFERING -> {
                 _playerStateName.value = "BUFFERING"
                 _isBuffering.value = true
-                _lastDiagnosticLog.value = "Buffering audio..."
+                _lastDiagnosticLog.value = "ExoPlayer: Buffering audio stream..."
             }
             Player.STATE_READY -> {
                 _playerStateName.value = "READY"
@@ -220,13 +268,13 @@ object AudioPlayerManager : Player.Listener {
                 if (dur > 0) {
                     _durationMs.value = dur
                 }
-                _lastDiagnosticLog.value = "Audio Ready (Duration: ${dur / 1000}s)"
+                _lastDiagnosticLog.value = "ExoPlayer: Ready to play. Duration: ${dur / 1000}s"
             }
             Player.STATE_ENDED -> {
                 _playerStateName.value = "ENDED"
                 _isBuffering.value = false
                 _isPlaying.value = false
-                _lastDiagnosticLog.value = "Playback ended."
+                _lastDiagnosticLog.value = "ExoPlayer: Track ended."
             }
         }
     }
@@ -235,8 +283,11 @@ object AudioPlayerManager : Player.Listener {
         _isPlaying.value = false
         _isBuffering.value = false
         _playerStateName.value = "ERROR"
-        _errorMessage.value = "Audio error: ${error.localizedMessage ?: "Source unavailable"}"
-        _lastDiagnosticLog.value = "Error [${error.errorCode}]: ${error.message}"
+        
+        val curr = _currentSong.value
+        val errStr = "Playback error [Code ${error.errorCode}]: ${error.message ?: "Media source unreachable"}"
+        _errorMessage.value = errStr
+        _lastDiagnosticLog.value = "ERROR for Track '${curr?.title}' (ID: ${curr?.id}): $errStr"
     }
 
     fun release() {

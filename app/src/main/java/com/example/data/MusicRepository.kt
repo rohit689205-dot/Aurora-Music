@@ -88,11 +88,11 @@ class MusicRepository(private val songDao: SongDao) {
         val currentSongs = allSongs.first()
         if (currentSongs.isEmpty()) {
             val sampleSongs = listOf(
-                Song(id = "1", title = "Midnight City", artist = "M83", album = "Hurry Up, We're Dreaming", duration = 243000, artworkUrl = "https://upload.wikimedia.org/wikipedia/en/2/23/M83_-_Hurry_Up%2C_We%27re_Dreaming.png", streamUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"),
-                Song(id = "2", title = "Blinding Lights", artist = "The Weeknd", album = "After Hours", duration = 200000, artworkUrl = "https://upload.wikimedia.org/wikipedia/en/e/e6/The_Weeknd_-_Blinding_Lights.png", streamUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"),
-                Song(id = "3", title = "Levitating", artist = "Dua Lipa", album = "Future Nostalgia", duration = 203000, artworkUrl = "https://upload.wikimedia.org/wikipedia/en/f/f5/Dua_Lipa_-_Levitating.png", streamUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3"),
-                Song(id = "4", title = "Save Your Tears", artist = "The Weeknd", album = "After Hours", duration = 215000, artworkUrl = "https://upload.wikimedia.org/wikipedia/en/e/e6/The_Weeknd_-_Blinding_Lights.png", streamUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3"),
-                Song(id = "5", title = "Good 4 U", artist = "Olivia Rodrigo", album = "SOUR", duration = 178000, artworkUrl = "https://upload.wikimedia.org/wikipedia/en/b/b2/Olivia_Rodrigo_-_Good_4_U.png", streamUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3")
+                Song(id = "1", title = "Midnight City (Authorized Preview)", artist = "M83", album = "Hurry Up, We're Dreaming", duration = 243000, artworkUrl = "https://upload.wikimedia.org/wikipedia/en/2/23/M83_-_Hurry_Up%2C_We%27re_Dreaming.png", streamUrl = com.example.playback.AudioPlayerManager.OFFICIAL_TEST_AUDIO_URI),
+                Song(id = "2", title = "Blinding Lights (Authorized Preview)", artist = "The Weeknd", album = "After Hours", duration = 200000, artworkUrl = "https://upload.wikimedia.org/wikipedia/en/e/e6/The_Weeknd_-_Blinding_Lights.png", streamUrl = com.example.playback.AudioPlayerManager.OFFICIAL_TEST_AUDIO_URI),
+                Song(id = "3", title = "Levitating (Authorized Preview)", artist = "Dua Lipa", album = "Future Nostalgia", duration = 203000, artworkUrl = "https://upload.wikimedia.org/wikipedia/en/f/f5/Dua_Lipa_-_Levitating.png", streamUrl = com.example.playback.AudioPlayerManager.OFFICIAL_TEST_AUDIO_URI),
+                Song(id = "4", title = "Save Your Tears (Authorized Preview)", artist = "The Weeknd", album = "After Hours", duration = 215000, artworkUrl = "https://upload.wikimedia.org/wikipedia/en/e/e6/The_Weeknd_-_Blinding_Lights.png", streamUrl = com.example.playback.AudioPlayerManager.OFFICIAL_TEST_AUDIO_URI),
+                Song(id = "5", title = "Good 4 U (Authorized Preview)", artist = "Olivia Rodrigo", album = "SOUR", duration = 178000, artworkUrl = "https://upload.wikimedia.org/wikipedia/en/b/b2/Olivia_Rodrigo_-_Good_4_U.png", streamUrl = com.example.playback.AudioPlayerManager.OFFICIAL_TEST_AUDIO_URI)
             )
             songDao.insertSongs(sampleSongs)
         }

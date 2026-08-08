@@ -10,15 +10,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PlaylistPlay
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,7 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
-import com.example.data.api.YouTubeMapper
+import com.example.model.Album
 import com.example.model.Artist
 import com.example.model.Playlist
 import com.example.model.Song
@@ -49,7 +48,8 @@ fun SearchScreen(
     onSongSelect: (Song) -> Unit = {},
     onPlaylistSelect: (String) -> Unit = {},
     onArtistSelect: (String) -> Unit = {},
-    viewModel: YouTubeSearchViewModel = viewModel(),
+    onAlbumSelect: (String) -> Unit = {},
+    viewModel: SearchViewModel = viewModel(),
     modifier: Modifier = Modifier
 ) {
     val query by viewModel.query.collectAsStateWithLifecycle()
@@ -58,7 +58,7 @@ fun SearchScreen(
     val isLoadingMore by viewModel.isLoadingMore.collectAsStateWithLifecycle()
 
     var selectedSongForDetails by remember { mutableStateOf<Song?>(null) }
-    val defaultSuggestions = listOf("Synthwave Music", "Lofi Hip Hop Beats", "Top Popular Songs 2026", "Chillout Playlist", "EDM Mix")
+    val defaultSuggestions = listOf("Top Tracks 2026", "Arijit Singh", "Lofi Beats", "Synthwave Hits", "Chillout Playlist")
 
     Scaffold(
         topBar = {
@@ -67,11 +67,11 @@ fun SearchScreen(
                     TextField(
                         value = query,
                         onValueChange = { viewModel.onQueryChanged(it) },
-                        placeholder = { Text("Search YouTube videos, songs, playlists...", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        placeholder = { Text("Search songs, artists, albums...", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(end = Spacing.M)
-                            .testTag("youtube_search_input"),
+                            .testTag("music_search_input"),
                         colors = TextFieldDefaults.colors(
                             focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -133,7 +133,7 @@ fun SearchScreen(
                 if (query.isBlank()) {
                     item {
                         Text(
-                            text = "Popular YouTube Suggestions",
+                            text = "Popular Music Searches",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onBackground,
@@ -171,7 +171,7 @@ fun SearchScreen(
                                         horizontalAlignment = Alignment.CenterHorizontally
                                     ) {
                                         Text(
-                                            text = "YouTube Data API Error",
+                                            text = "Search Error",
                                             style = MaterialTheme.typography.titleMedium,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.onErrorContainer
@@ -204,7 +204,7 @@ fun SearchScreen(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = "No YouTube results found for \"$query\"",
+                                        text = "No results found for \"$query\"",
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
@@ -213,75 +213,52 @@ fun SearchScreen(
                         is UiState.Success -> {
                             val data = state.data
 
-                            // Artists / Channels section
+                            // Artists section
                             if (data.artists.isNotEmpty() && (selectedFilter == SearchFilter.ALL || selectedFilter == SearchFilter.ARTISTS)) {
                                 item {
                                     Text(
-                                        text = "Channels & Artists",
+                                        text = "Artists",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.padding(horizontal = Spacing.XL, vertical = Spacing.M)
                                     )
                                 }
                                 items(data.artists) { artist ->
-                                    YouTubeArtistListItem(artist = artist, onClick = { onArtistSelect(artist.id) })
+                                    ArtistListItem(artist = artist, onClick = { onArtistSelect(artist.id) })
                                 }
                             }
 
-                            // Playlists section
-                            if (data.playlists.isNotEmpty() && (selectedFilter == SearchFilter.ALL || selectedFilter == SearchFilter.PLAYLISTS)) {
+                            // Albums section
+                            if (data.albums.isNotEmpty() && (selectedFilter == SearchFilter.ALL || selectedFilter == SearchFilter.ALBUMS)) {
                                 item {
                                     Text(
-                                        text = "Playlists",
+                                        text = "Albums",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.padding(horizontal = Spacing.XL, vertical = Spacing.M)
                                     )
                                 }
-                                items(data.playlists) { playlist ->
-                                    YouTubePlaylistListItem(playlist = playlist, onClick = { onPlaylistSelect(playlist.id) })
+                                items(data.albums) { album ->
+                                    AlbumListItem(album = album, onClick = { onAlbumSelect(album.id) })
                                 }
                             }
 
-                            // Videos / Songs section
-                            if (data.songs.isNotEmpty() && (selectedFilter == SearchFilter.ALL || selectedFilter == SearchFilter.MUSIC)) {
+                            // Tracks section
+                            if (data.songs.isNotEmpty() && (selectedFilter == SearchFilter.ALL || selectedFilter == SearchFilter.SONGS)) {
                                 item {
                                     Text(
-                                        text = "Videos & Music Tracks",
+                                        text = "Tracks",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.padding(horizontal = Spacing.XL, vertical = Spacing.M)
                                     )
                                 }
                                 items(data.songs) { song ->
-                                    YouTubeSongListItem(
+                                    SongListItem(
                                         song = song,
                                         onClick = { onSongSelect(song) },
                                         onInfoClick = { selectedSongForDetails = song }
                                     )
-                                }
-                            }
-
-                            // Load More / Pagination
-                            if (!data.nextPageToken.isNullOrBlank()) {
-                                item {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(Spacing.XL),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        if (isLoadingMore) {
-                                            CircularProgressIndicator(modifier = Modifier.size(28.dp))
-                                        } else {
-                                            OutlinedButton(
-                                                onClick = { viewModel.loadNextPage() },
-                                                modifier = Modifier.testTag("load_more_btn")
-                                            ) {
-                                                Text("Load More Results")
-                                            }
-                                        }
-                                    }
                                 }
                             }
                         }
@@ -291,7 +268,7 @@ fun SearchScreen(
         }
     }
 
-    // Video Detail Modal Dialog
+    // Track Detail Modal Dialog
     selectedSongForDetails?.let { song ->
         AlertDialog(
             onDismissRequest = { selectedSongForDetails = null },
@@ -308,8 +285,9 @@ fun SearchScreen(
                         contentScale = ContentScale.Crop
                     )
                     Spacer(modifier = Modifier.height(Spacing.M))
-                    Text("Channel: ${song.artist}", fontWeight = FontWeight.SemiBold)
-                    Text("YouTube Video ID: ${song.id}")
+                    Text("Artist: ${song.artist}", fontWeight = FontWeight.SemiBold)
+                    Text("Album: ${song.album}")
+                    Text("Track ID: ${song.id}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (song.duration > 0) {
                         val minutes = (song.duration / 1000) / 60
                         val seconds = (song.duration / 1000) % 60
@@ -337,7 +315,7 @@ fun SearchScreen(
 }
 
 @Composable
-fun YouTubeSongListItem(
+fun SongListItem(
     song: Song,
     onClick: () -> Unit,
     onInfoClick: () -> Unit
@@ -354,27 +332,10 @@ fun YouTubeSongListItem(
                 model = song.artworkUrl,
                 contentDescription = song.title,
                 modifier = Modifier
-                    .size(60.dp, 50.dp)
+                    .size(56.dp)
                     .clip(RoundedCornerShape(8.dp)),
                 contentScale = ContentScale.Crop
             )
-            Surface(
-                color = Color.Black.copy(alpha = 0.7f),
-                shape = RoundedCornerShape(4.dp),
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(2.dp)
-            ) {
-                val secTotal = song.duration / 1000
-                val mins = secTotal / 60
-                val secs = secTotal % 60
-                Text(
-                    text = String.format("%d:%02d", mins, secs),
-                    color = Color.White,
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                )
-            }
         }
         Spacer(modifier = Modifier.width(Spacing.M))
         Column(modifier = Modifier.weight(1f)) {
@@ -386,7 +347,7 @@ fun YouTubeSongListItem(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = song.artist,
+                text = "${song.artist} • ${song.album}",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -403,7 +364,58 @@ fun YouTubeSongListItem(
 }
 
 @Composable
-fun YouTubePlaylistListItem(
+fun AlbumListItem(
+    album: Album,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = Spacing.XL, vertical = Spacing.S),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box {
+            AsyncImage(
+                model = album.artwork,
+                contentDescription = album.title,
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(RoundedCornerShape(8.dp)),
+                contentScale = ContentScale.Crop
+            )
+            Icon(
+                Icons.Rounded.Album,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(24.dp)
+                    .background(Color.Black.copy(alpha = 0.3f), CircleShape)
+            )
+        }
+        Spacer(modifier = Modifier.width(Spacing.M))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = album.title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = "Album • ${album.totalTracks} tracks",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+fun PlaylistListItem(
     playlist: Playlist,
     onClick: () -> Unit
 ) {
@@ -454,7 +466,7 @@ fun YouTubePlaylistListItem(
 }
 
 @Composable
-fun YouTubeArtistListItem(
+fun ArtistListItem(
     artist: Artist,
     onClick: () -> Unit
 ) {
@@ -494,7 +506,7 @@ fun YouTubeArtistListItem(
                 }
             }
             Text(
-                text = "YouTube Channel",
+                text = "Artist",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

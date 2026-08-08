@@ -30,7 +30,8 @@ import com.example.ui.theme.Spacing
 fun SettingsScreen(
     onNavigateToStorage: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: SettingsViewModel = viewModel()
+    viewModel: SettingsViewModel = viewModel(),
+    updateViewModel: com.example.update.UpdateViewModel = viewModel()
 ) {
     val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
     val uiDensity by viewModel.uiDensity.collectAsStateWithLifecycle()
@@ -238,11 +239,62 @@ fun SettingsScreen(
         }
         
         item {
-            SettingsCategory("About")
+            SettingsCategory("About Aurora Music")
+            
+            val updateState by updateViewModel.updateState.collectAsStateWithLifecycle()
+            val updateMode by updateViewModel.updateMode.collectAsStateWithLifecycle()
+
+            val updateStatusSubtitle = when (val s = updateState) {
+                is com.example.update.UpdateState.Checking -> "Checking for updates..."
+                is com.example.update.UpdateState.NoUpdate -> "You're up to date (v${updateViewModel.currentVersionName})"
+                is com.example.update.UpdateState.UpdateAvailable -> "Update Available (v${s.availableVersionName}) - Tap to install"
+                is com.example.update.UpdateState.Downloading -> "Downloading update... ${s.progressPercent}%"
+                is com.example.update.UpdateState.Downloaded -> "Update Downloaded! Tap to restart and install"
+                is com.example.update.UpdateState.Installing -> "Installing update..."
+                is com.example.update.UpdateState.Error -> s.message
+                else -> "Check for official Google Play updates"
+            }
+
+            SettingsItem(
+                icon = Icons.Rounded.SystemUpdate,
+                title = "Check for Updates",
+                subtitle = updateStatusSubtitle,
+                onClick = {
+                    val s = updateState
+                    if (s is com.example.update.UpdateState.Downloaded) {
+                        updateViewModel.completeUpdate()
+                    } else {
+                        updateViewModel.checkForUpdate(isUserInitiated = true)
+                        showToast("Checking Google Play for updates...")
+                    }
+                }
+            )
+
+            SettingsItem(
+                icon = Icons.Rounded.PublishedWithChanges,
+                title = "Update Preference",
+                subtitle = "Current: ${updateMode.name} Update",
+                onClick = {
+                    val nextMode = if (updateMode == com.example.update.UpdateMode.FLEXIBLE) com.example.update.UpdateMode.IMMEDIATE else com.example.update.UpdateMode.FLEXIBLE
+                    updateViewModel.setUpdateMode(nextMode)
+                    showToast("Update mode set to ${nextMode.name}")
+                }
+            )
+
+            SettingsItem(
+                icon = Icons.Rounded.PlayForWork,
+                title = "Test Update Flow (Demo)",
+                subtitle = "Simulate downloading flexible update & restart",
+                onClick = {
+                    updateViewModel.startSimulatedUpdate()
+                    showToast("Simulating update download flow...")
+                }
+            )
+
             SettingsItem(
                 icon = Icons.Rounded.Info,
                 title = "Version",
-                subtitle = "1.0.0 (Build 2026)",
+                subtitle = "v${updateViewModel.currentVersionName} (Build ${updateViewModel.currentVersionCode})",
                 onClick = {
                     if (!isDeveloperMode) {
                         developerModeUnlockClicks++
@@ -709,7 +761,7 @@ fun SettingsScreen(
                     Text("• Room Database (Apache 2.0)")
                     Text("• Retrofit & OkHttp (Apache 2.0)")
                     Text("• Coil Image Loading (Apache 2.0)")
-                    Text("• YouTube Data API v3")
+                    Text("• Innertube YouTube Music Engine")
                 }
             },
             confirmButton = {
@@ -720,7 +772,7 @@ fun SettingsScreen(
         )
     }
 
-    // 9. Playback Diagnostics Dialog
+    // 9. Playback & Spotify Developer Diagnostics Dialog
     if (showDiagnosticsDialog) {
         val diagSong by com.example.playback.AudioPlayerManager.currentSong.collectAsStateWithLifecycle()
         val diagIsPlaying by com.example.playback.AudioPlayerManager.isPlaying.collectAsStateWithLifecycle()
@@ -735,7 +787,7 @@ fun SettingsScreen(
 
         AlertDialog(
             onDismissRequest = { showDiagnosticsDialog = false },
-            title = { Text("Playback Diagnostics", fontWeight = FontWeight.Bold) },
+            title = { Text("Developer Diagnostics & Integration Test", fontWeight = FontWeight.Bold) },
             text = {
                 Column(
                     modifier = Modifier
@@ -743,18 +795,96 @@ fun SettingsScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(Spacing.S)
                 ) {
-                    Text("• Current Track: ${diagSong?.title ?: "None"}", style = MaterialTheme.typography.bodySmall)
-                    Text("• Artist: ${diagSong?.artist ?: "N/A"}", style = MaterialTheme.typography.bodySmall)
-                    Text("• Stream URL: ${diagSong?.streamUrl?.takeIf { it.isNotBlank() } ?: "Mapped/Default"}", style = MaterialTheme.typography.bodySmall)
-                    Text("• Player State: $diagStateName", style = MaterialTheme.typography.bodySmall)
-                    Text("• Is Playing: $diagIsPlaying | Buffering: $diagIsBuffering", style = MaterialTheme.typography.bodySmall)
-                    Text("• Position / Duration: ${diagPosMs / 1000}s / ${diagDurMs / 1000}s", style = MaterialTheme.typography.bodySmall)
-                    Text("• Volume: ${(diagVol * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
-                    Text("• Audio Focus: $diagAudioFocus", style = MaterialTheme.typography.bodySmall)
-                    if (diagErr != null) {
-                        Text("• Last Error: $diagErr", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(Spacing.M)) {
+                            Text("Real-Time Player State", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(Spacing.XS))
+                            Text("• Current Track: ${diagSong?.title ?: "None"}", style = MaterialTheme.typography.bodySmall)
+                            Text("• Track ID: ${diagSong?.id ?: "N/A"}", style = MaterialTheme.typography.bodySmall)
+                            Text("• Artist: ${diagSong?.artist ?: "N/A"}", style = MaterialTheme.typography.bodySmall)
+                            Text("• Stream URL: ${diagSong?.streamUrl?.takeIf { it.isNotBlank() } ?: "None"}", style = MaterialTheme.typography.bodySmall)
+                            Text("• Player State: $diagStateName", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                            Text("• Is Playing: $diagIsPlaying | Buffering: $diagIsBuffering", style = MaterialTheme.typography.bodySmall)
+                            Text("• Position / Duration: ${diagPosMs / 1000}s / ${diagDurMs / 1000}s", style = MaterialTheme.typography.bodySmall)
+                            Text("• Volume: ${(diagVol * 100).toInt()}% | Audio Focus: $diagAudioFocus", style = MaterialTheme.typography.bodySmall)
+                            if (diagErr != null) {
+                                Text("• Last Error: $diagErr", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                            }
+                        }
                     }
-                    Text("• Diagnostic Log: $diagLog", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+
+                    Spacer(modifier = Modifier.height(Spacing.XS))
+                    Text("Interactive Controls & Test Play", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.S)
+                    ) {
+                        Button(
+                            onClick = {
+                                com.example.playback.AudioPlayerManager.playTestTrack(context)
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Rounded.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Test Track", style = MaterialTheme.typography.bodySmall)
+                        }
+
+                        Button(
+                            onClick = {
+                                com.example.playback.AudioPlayerManager.togglePlayPause()
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
+                        ) {
+                            Icon(
+                                if (diagIsPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(if (diagIsPlaying) "Pause" else "Resume", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.S)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                com.example.playback.AudioPlayerManager.seekTo((diagPosMs - 10000L).coerceAtLeast(0L))
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("-10s", style = MaterialTheme.typography.bodySmall)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                com.example.playback.AudioPlayerManager.seekTo(diagPosMs + 10000L)
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("+10s", style = MaterialTheme.typography.bodySmall)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                com.example.playback.AudioPlayerManager.stop()
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Stop", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(Spacing.XS))
+                    Text("Diagnostic Event Log:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    Text(diagLog, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
             confirmButton = {

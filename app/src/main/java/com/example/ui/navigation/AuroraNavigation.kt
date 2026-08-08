@@ -58,11 +58,31 @@ enum class FloatingNavItem(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AuroraApp(playerViewModel: PlayerViewModel = viewModel()) {
+fun AuroraApp(
+    playerViewModel: PlayerViewModel = viewModel(),
+    updateViewModel: com.example.update.UpdateViewModel = viewModel()
+) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val showBottomBar = currentRoute !in listOf("splash", "welcome")
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                (context as? android.app.Activity)?.let { activity ->
+                    updateViewModel.checkResumeUpdate(activity)
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     val songsState by playerViewModel.allSongsState.collectAsStateWithLifecycle()
     val currentSong by playerViewModel.currentSong.collectAsStateWithLifecycle()
@@ -224,6 +244,12 @@ fun AuroraApp(playerViewModel: PlayerViewModel = viewModel()) {
                     )
                 }
             }
+
+            // In-App Update Overlay (Progress / Restart Banner / Flexible Dialog)
+            com.example.update.AuroraUpdateOverlay(
+                updateViewModel = updateViewModel,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
 
             // Mini Player overlay floating above bottom bar
             if (showBottomBar) {

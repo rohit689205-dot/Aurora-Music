@@ -212,14 +212,98 @@ fun LibraryScreen(
 
     // --- LOCAL FILES DIALOG ---
     if (showLocalFilesDialog) {
+        var localSongs by remember { mutableStateOf<List<Song>?>(null) }
+        var isScanning by remember { mutableStateOf(false) }
+        val coroutineScope = rememberCoroutineScope()
+
+        LaunchedEffect(Unit) {
+            isScanning = true
+            val repo = com.example.data.LocalMusicRepository(context)
+            localSongs = repo.getLocalSongs()
+            isScanning = false
+        }
+
         AlertDialog(
             onDismissRequest = { showLocalFilesDialog = false },
-            title = { Text("Local Files") },
+            title = { Text("Local Device Music") },
             text = {
-                Column {
-                    Text("Scanning device audio storage...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(modifier = Modifier.height(Spacing.M))
-                    Text("0 local external audio files detected. All streamed tracks are stored in offline cache.")
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 350.dp)
+                ) {
+                    if (isScanning) {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).padding(Spacing.M))
+                        Text(
+                            "Scanning MediaStore audio files...",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        )
+                    } else {
+                        val songs = localSongs ?: emptyList()
+                        if (songs.isNotEmpty()) {
+                            Text(
+                                "Found ${songs.size} local tracks on device:",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(Spacing.S))
+                            LazyColumn(
+                                verticalArrangement = Arrangement.spacedBy(Spacing.XS),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                items(songs) { song ->
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                onSongClick(song)
+                                                showLocalFilesDialog = false
+                                            },
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(Spacing.M),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(Icons.Rounded.MusicNote, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                            Spacer(modifier = Modifier.width(Spacing.M))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(song.title, fontWeight = FontWeight.Bold, maxLines = 1)
+                                                Text(song.artist, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            Text(
+                                "No local MP3/audio files found in device storage.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(Spacing.S))
+                            Text(
+                                "You can test real audio playback using our authorized direct audio test track.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(Spacing.M))
+                            Button(
+                                onClick = {
+                                    com.example.playback.AudioPlayerManager.playTestTrack(context)
+                                    showLocalFilesDialog = false
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Rounded.PlayArrow, contentDescription = null)
+                                Spacer(modifier = Modifier.width(Spacing.S))
+                                Text("Play Authorized Direct Test Track")
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {

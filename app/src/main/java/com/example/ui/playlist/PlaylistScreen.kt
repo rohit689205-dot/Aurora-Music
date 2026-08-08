@@ -1,22 +1,18 @@
 package com.example.ui.playlist
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.PlaylistPlay
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -27,21 +23,20 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.model.Song
 import com.example.ui.components.SkeletonSongListItem
-import com.example.ui.search.YouTubeSongListItem
+import com.example.ui.search.SongListItem
 import com.example.ui.state.UiState
 import com.example.ui.theme.Spacing
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlaylistScreen(
-    playlistId: String = "PLDISKgbnvpk7sB1kRjLpA4gT_", // Default popular playlist if none provided
+    playlistId: String = "trending_playlist",
     onBack: () -> Unit,
     onSongClick: (Song) -> Unit = {},
-    viewModel: YouTubePlaylistViewModel = viewModel(),
+    viewModel: PlaylistViewModel = viewModel(),
     modifier: Modifier = Modifier
 ) {
     val playlistState by viewModel.playlistState.collectAsStateWithLifecycle()
-    val isLoadingMore by viewModel.isLoadingMore.collectAsStateWithLifecycle()
 
     LaunchedEffect(playlistId) {
         viewModel.loadPlaylist(playlistId)
@@ -50,7 +45,7 @@ fun PlaylistScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("YouTube Playlist", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                title = { Text("Playlist", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
@@ -127,7 +122,7 @@ fun PlaylistScreen(
                                 .padding(Spacing.XXL),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("No tracks found in this YouTube playlist.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("No tracks found in this playlist.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -194,34 +189,11 @@ fun PlaylistScreen(
 
                     // Songs
                     items(items) { song ->
-                        YouTubeSongListItem(
+                        SongListItem(
                             song = song,
                             onClick = { onSongClick(song) },
                             onInfoClick = { onSongClick(song) }
                         )
-                    }
-
-                    // Pagination
-                    if (!playlistData.nextPageToken.isNullOrBlank()) {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(Spacing.XL),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (isLoadingMore) {
-                                    CircularProgressIndicator(modifier = Modifier.size(28.dp))
-                                } else {
-                                    OutlinedButton(
-                                        onClick = { viewModel.loadNextPage() },
-                                        modifier = Modifier.testTag("playlist_load_more_btn")
-                                    ) {
-                                        Text("Load More Tracks")
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
             }
