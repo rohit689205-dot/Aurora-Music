@@ -2,7 +2,7 @@ package com.example.ui.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.data.YTMusicRepository
+import com.example.data.providers.UnifiedMusicSearchRepository
 import com.example.data.YTMusicSearchResult
 import com.example.ui.state.UiState
 import kotlinx.coroutines.FlowPreview
@@ -24,7 +24,7 @@ enum class SearchFilter(val label: String) {
 }
 
 class SearchViewModel(
-    private val repository: YTMusicRepository = YTMusicRepository()
+    private val unifiedRepository: UnifiedMusicSearchRepository = UnifiedMusicSearchRepository()
 ) : ViewModel() {
 
     private val _query = MutableStateFlow("")
@@ -75,26 +75,20 @@ class SearchViewModel(
     private fun executeSearch(q: String) {
         viewModelScope.launch {
             _searchState.value = UiState.Loading
-
-            repository.search(query = q)
-                .collect { result ->
-                    result.fold(
-                        onSuccess = { searchResult ->
-                            if (searchResult.songs.isEmpty() &&
-                                searchResult.artists.isEmpty() &&
-                                searchResult.albums.isEmpty() &&
-                                searchResult.playlists.isEmpty()
-                            ) {
-                                _searchState.value = UiState.Empty
-                            } else {
-                                _searchState.value = UiState.Success(searchResult)
-                            }
-                        },
-                        onFailure = { error ->
-                            _searchState.value = UiState.Error(error.localizedMessage ?: "Failed to load music search results")
-                        }
-                    )
+            try {
+                val searchResult = unifiedRepository.searchAll(q)
+                if (searchResult.songs.isEmpty() &&
+                    searchResult.artists.isEmpty() &&
+                    searchResult.albums.isEmpty() &&
+                    searchResult.playlists.isEmpty()
+                ) {
+                    _searchState.value = UiState.Empty
+                } else {
+                    _searchState.value = UiState.Success(searchResult)
                 }
+            } catch (e: Exception) {
+                _searchState.value = UiState.Error(e.localizedMessage ?: "Failed to load music search results")
+            }
         }
     }
 }

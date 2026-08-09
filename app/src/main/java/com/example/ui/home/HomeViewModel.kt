@@ -2,7 +2,7 @@ package com.example.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.data.YTMusicRepository
+import com.example.data.providers.UnifiedMusicSearchRepository
 import com.example.model.Album
 import com.example.model.Artist
 import com.example.model.Playlist
@@ -11,7 +11,6 @@ import com.example.ui.state.UiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 data class HomeMusicData(
@@ -30,7 +29,7 @@ data class HomeMusicData(
 )
 
 class HomeViewModel(
-    private val repository: YTMusicRepository = YTMusicRepository()
+    private val unifiedRepository: UnifiedMusicSearchRepository = UnifiedMusicSearchRepository()
 ) : ViewModel() {
 
     private val _homeState = MutableStateFlow<UiState<HomeMusicData>>(UiState.Loading)
@@ -57,42 +56,25 @@ class HomeViewModel(
             try {
                 val queryPrefix = mood ?: genre ?: "Indian trending"
 
-                val trendingResult = repository.search("Indian trending hits").first()
-                val popularResult = repository.search("Popular in India").first()
-                val hindiResult = repository.search(if (mood != null || genre != null) queryPrefix else "Hindi hit songs").first()
-                val punjabiResult = repository.search("Punjabi hit songs").first()
-                val bollywoodResult = repository.search("Bollywood film music").first()
+                val trendingResult = unifiedRepository.searchAll("Indian trending hits")
+                val popularResult = unifiedRepository.searchAll("Popular in India")
+                val hindiResult = unifiedRepository.searchAll(if (mood != null || genre != null) queryPrefix else "Hindi hit songs")
+                val punjabiResult = unifiedRepository.searchAll("Punjabi hit songs")
+                val bollywoodResult = unifiedRepository.searchAll("Bollywood film music")
 
-                val trendingSongs = trendingResult.getOrNull()?.songs ?: emptyList()
-                val popularSongs = popularResult.getOrNull()?.songs ?: emptyList()
-                val hindiSongs = hindiResult.getOrNull()?.songs ?: emptyList()
-                val punjabiSongs = punjabiResult.getOrNull()?.songs ?: emptyList()
-                val bollywoodSongs = bollywoodResult.getOrNull()?.songs ?: emptyList()
+                val trendingSongs = trendingResult.songs
+                val popularSongs = popularResult.songs
+                val hindiSongs = hindiResult.songs
+                val punjabiSongs = punjabiResult.songs
+                val bollywoodSongs = bollywoodResult.songs
 
                 val allSongs = (trendingSongs + popularSongs + hindiSongs + punjabiSongs + bollywoodSongs).distinctBy { it.id }
 
                 if (allSongs.isEmpty()) {
                     _homeState.value = UiState.Empty
                 } else {
-                    val artists = allSongs.map { it.artist }.distinct().take(8).map { name ->
-                        Artist(
-                            id = "artist_${name.hashCode()}",
-                            name = name,
-                            image = allSongs.firstOrNull { it.artist == name }?.artworkUrl ?: ""
-                        )
-                    }
-
-                    val albums = allSongs.map { it.album }.distinct().take(8).map { title ->
-                        val sample = allSongs.firstOrNull { it.album == title }
-                        Album(
-                            id = "album_${title.hashCode()}",
-                            title = title,
-                            artistId = "artist_${sample?.artist?.hashCode()}",
-                            artwork = sample?.artworkUrl ?: "",
-                            releaseDate = System.currentTimeMillis(),
-                            totalTracks = 10
-                        )
-                    }
+                    val artists = (trendingResult.artists + popularResult.artists + hindiResult.artists).distinctBy { it.name }.take(8)
+                    val albums = (trendingResult.albums + popularResult.albums + hindiResult.albums).distinctBy { it.title }.take(8)
 
                     val playlists = listOf(
                         Playlist(id = "playlist_india_top", title = "India Top 50 Chart", description = "Trending hits across India"),

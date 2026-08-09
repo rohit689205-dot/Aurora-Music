@@ -1,16 +1,21 @@
 package com.example.data
 
 import android.util.Log
-import com.example.data.api.JioSaavnApiClient
+import com.example.data.api.AuroraApiClient
 import com.example.data.api.YTMusicApiClient
+import com.example.data.api.model.AuroraItemDto
 import com.example.data.api.model.InnertubePlayerRequest
 import com.example.data.api.model.InnertubeSearchRequest
+import com.example.data.providers.MusicProvider
+import com.example.data.providers.ProviderCapabilities
 import com.example.model.Album
 import com.example.model.Artist
 import com.example.model.Playlist
 import com.example.model.Song
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 data class YTMusicSearchResult(
@@ -36,51 +41,95 @@ data class YTMusicArtistData(
     val albums: List<Album>
 )
 
-class YTMusicRepository {
+class YTMusicRepository : MusicProvider {
+
+    override val providerName: String = "YouTubeMusic"
+    override val capabilities: ProviderCapabilities = ProviderCapabilities(
+        search = true,
+        artists = true,
+        albums = true,
+        playlists = true,
+        lyrics = true,
+        playback = false
+    )
 
     private val apiService = YTMusicApiClient.apiService
 
-    fun search(query: String): Flow<Result<YTMusicSearchResult>> = flow {
+    override suspend fun search(query: String): Result<YTMusicSearchResult> = withContext(Dispatchers.IO) {
         val trimmed = query.trim()
         if (trimmed.isEmpty()) {
-            emit(Result.success(YTMusicSearchResult()))
-            return@flow
+            return@withContext Result.success(YTMusicSearchResult())
         }
 
-        val result = try {
-            // First search on JioSaavn for high quality audio & rich metadata
-            val saavnResp = JioSaavnApiClient.apiService.searchSongs(query = trimmed, limit = 15)
-            val saavnSongs = mutableListOf<Song>()
-            if (saavnResp.isSuccessful && saavnResp.body()?.results != null) {
-                saavnResp.body()!!.results!!.forEach { item ->
-                    val id = item.id ?: return@forEach
-                    val title = item.song?.replace("&quot;", "\"")?.replace("&amp;", "&") ?: "Unknown Track"
-                    val artist = item.primaryArtists ?: item.singers ?: "Unknown Artist"
-                    val album = item.album ?: "Single"
-                    var img = item.image ?: ""
-                    img = img.replace("150x150", "500x500").replace("50x50", "500x500")
+        // 1. Try FastAPI backend (ytmusicapi)
+        try {
+            val auroraResp = AuroraApiClient.apiService.search(trimmed)
+            if (auroraResp.isSuccessful && auroraResp.body() != null) {
+                val dto = auroraResp.body()!!
+                
+                val rawSongs: List<AuroraItemDto> = if (dto.songs.isNotEmpty()) dto.songs else dto.results.filter { it.type == "song" }
+                val songs: List<Song> = rawSongs.map { item ->
+                    Song(
+                        id = item.id,
+                        title = item.title,
+                        artist = item.artist,
+                        album = item.album ?: "Single",
+                        duration = 210000L,
+                        artworkUrl = item.thumbnail ?: "",
+                        streamUrl = item.streamUrl ?: "",
+                        playbackAvailable = item.playbackAvailable,
+                        sourceProvider = "YouTubeMusic (ytmusicapi)",
+                        isPreview = false
+                    )
+                }
 
-                    val durationMs = try {
-                        (item.duration?.toLong() ?: 180L) * 1000L
-                    } catch (e: Exception) {
-                        180000L
-                    }
+                val rawArtists: List<AuroraItemDto> = if (dto.artists.isNotEmpty()) dto.artists else dto.results.filter { it.type == "artist" }
+                val artists: List<Artist> = rawArtists.map { item ->
+                    Artist(
+                        id = item.id,
+                        name = if (item.title.isNotBlank()) item.title else item.artist,
+                        image = item.thumbnail ?: ""
+                    )
+                }
 
-                    saavnSongs.add(
-                        Song(
-                            id = id,
-                            title = title,
-                            artist = artist,
-                            album = album,
-                            duration = durationMs,
-                            artworkUrl = img,
-                            streamUrl = item.mediaPreviewUrl ?: ""
+                val rawAlbums: List<AuroraItemDto> = if (dto.albums.isNotEmpty()) dto.albums else dto.results.filter { it.type == "album" }
+                val albums: List<Album> = rawAlbums.map { item ->
+                    Album(
+                        id = item.id,
+                        title = item.title,
+                        artistId = "artist_${item.artist.hashCode()}",
+                        artwork = item.thumbnail ?: "",
+                        releaseDate = System.currentTimeMillis(),
+                        totalTracks = 10
+                    )
+                }
+
+                val rawPlaylists: List<AuroraItemDto> = if (dto.playlists.isNotEmpty()) dto.playlists else dto.results.filter { it.type == "playlist" }
+                val playlists: List<Playlist> = rawPlaylists.map { item ->
+                    Playlist(
+                        id = item.id,
+                        title = item.title,
+                        description = "YouTube Music Playlist"
+                    )
+                }
+
+                if (songs.isNotEmpty() || artists.isNotEmpty() || albums.isNotEmpty() || playlists.isNotEmpty()) {
+                    return@withContext Result.success(
+                        YTMusicSearchResult(
+                            songs = songs,
+                            artists = artists,
+                            albums = albums,
+                            playlists = playlists
                         )
                     )
                 }
             }
+        } catch (e: Exception) {
+            Log.w("YTMusicRepository", "Aurora Backend query failed, falling back to InnerTube: ${e.localizedMessage}")
+        }
 
-            // Next perform Innertube YT Music Search
+        // 2. Direct InnerTube fallback
+        try {
             val ytRequest = InnertubeSearchRequest(
                 context = YTMusicApiClient.createSearchContext(),
                 query = trimmed
@@ -94,22 +143,16 @@ class YTMusicRepository {
                 ytSongs.addAll(parsedYtSongs)
             }
 
-            // Combine JioSaavn + YT Music songs (require non-blank stream URL)
-            val combinedSongs = (ytSongs + saavnSongs)
-                .filter { it.streamUrl.isNotBlank() }
-                .distinctBy { "${it.title.lowercase()}_${it.artist.lowercase()}" }
-
-            // Extract Artists & Albums dynamically
-            val artists = combinedSongs.map { it.artist }.distinct().take(5).map { artistName ->
+            val artists = ytSongs.map { it.artist }.distinct().take(5).map { artistName ->
                 Artist(
                     id = "artist_${artistName.hashCode()}",
                     name = artistName,
-                    image = combinedSongs.firstOrNull { it.artist == artistName }?.artworkUrl ?: ""
+                    image = ytSongs.firstOrNull { it.artist == artistName }?.artworkUrl ?: ""
                 )
             }
 
-            val albums = combinedSongs.map { it.album }.distinct().take(5).map { albumName ->
-                val sample = combinedSongs.firstOrNull { it.album == albumName }
+            val albums = ytSongs.map { it.album }.distinct().take(5).map { albumName ->
+                val sample = ytSongs.firstOrNull { it.album == albumName }
                 Album(
                     id = "album_${albumName.hashCode()}",
                     title = albumName,
@@ -122,7 +165,7 @@ class YTMusicRepository {
 
             Result.success(
                 YTMusicSearchResult(
-                    songs = combinedSongs,
+                    songs = ytSongs,
                     artists = artists,
                     albums = albums,
                     playlists = emptyList()
@@ -130,11 +173,34 @@ class YTMusicRepository {
             )
 
         } catch (e: Exception) {
-            Log.e("YTMusicRepository", "Search error", e)
+            Log.e("YTMusicRepository", "InnerTube Search error", e)
             Result.failure(e)
         }
+    }
 
-        emit(result)
+    override suspend fun getCharts(category: String): Result<List<Song>> = withContext(Dispatchers.IO) {
+        try {
+            val resp = AuroraApiClient.apiService.getCharts("IN")
+            if (resp.isSuccessful && !resp.body().isNullOrEmpty()) {
+                val songs = resp.body()!!.map { item ->
+                    Song(
+                        id = item.id,
+                        title = item.title,
+                        artist = item.artist,
+                        album = "Top Chart",
+                        duration = 210000L,
+                        artworkUrl = item.thumbnail ?: "",
+                        streamUrl = item.streamUrl ?: "",
+                        playbackAvailable = item.playbackAvailable,
+                        sourceProvider = "YouTubeMusic (ytmusicapi)"
+                    )
+                }
+                return@withContext Result.success(songs)
+            }
+        } catch (e: Exception) {
+            Log.w("YTMusicRepository", "Charts query to backend failed, falling back to search: ${e.localizedMessage}")
+        }
+        search(category).map { it.songs }
     }
 
     suspend fun getStreamUrlForVideo(videoId: String): String? {
@@ -233,7 +299,10 @@ class YTMusicRepository {
                                 album = album,
                                 duration = 210000L,
                                 artworkUrl = thumbUrl,
-                                streamUrl = ""
+                                streamUrl = "",
+                                playbackAvailable = false,
+                                sourceProvider = "YouTubeMusic",
+                                isPreview = false
                             )
                         )
                     }
@@ -246,6 +315,38 @@ class YTMusicRepository {
     }
 
     fun getAlbumData(albumId: String): Flow<Result<YTMusicAlbumData>> = flow {
+        try {
+            val resp = AuroraApiClient.apiService.getAlbum(albumId)
+            if (resp.isSuccessful && resp.body() != null) {
+                val detail = resp.body()!!
+                val album = Album(
+                    id = detail.id,
+                    title = detail.title,
+                    artistId = "artist_${detail.artist.hashCode()}",
+                    artwork = detail.thumbnail ?: "",
+                    releaseDate = System.currentTimeMillis(),
+                    totalTracks = detail.tracks.size
+                )
+                val songs = detail.tracks.map { item ->
+                    Song(
+                        id = item.id,
+                        title = item.title,
+                        artist = item.artist,
+                        album = detail.title,
+                        duration = 210000L,
+                        artworkUrl = item.thumbnail ?: "",
+                        streamUrl = item.streamUrl ?: "",
+                        playbackAvailable = item.playbackAvailable,
+                        sourceProvider = "YouTubeMusic (ytmusicapi)"
+                    )
+                }
+                emit(Result.success(YTMusicAlbumData(album = album, items = songs)))
+                return@flow
+            }
+        } catch (e: Exception) {
+            Log.w("YTMusicRepository", "Failed to get album data from backend: ${e.localizedMessage}")
+        }
+
         val album = Album(
             id = albumId,
             title = "Trending Album",
@@ -258,11 +359,79 @@ class YTMusicRepository {
     }
 
     fun getPlaylistData(playlistId: String): Flow<Result<YTMusicPlaylistData>> = flow {
+        try {
+            val resp = AuroraApiClient.apiService.getPlaylist(playlistId)
+            if (resp.isSuccessful && resp.body() != null) {
+                val detail = resp.body()!!
+                val playlist = Playlist(
+                    id = detail.id,
+                    title = detail.title,
+                    description = detail.description ?: "YouTube Music Playlist"
+                )
+                val songs = detail.tracks.map { item ->
+                    Song(
+                        id = item.id,
+                        title = item.title,
+                        artist = item.artist,
+                        album = detail.title,
+                        duration = 210000L,
+                        artworkUrl = item.thumbnail ?: "",
+                        streamUrl = item.streamUrl ?: "",
+                        playbackAvailable = item.playbackAvailable,
+                        sourceProvider = "YouTubeMusic (ytmusicapi)"
+                    )
+                }
+                emit(Result.success(YTMusicPlaylistData(playlist = playlist, items = songs)))
+                return@flow
+            }
+        } catch (e: Exception) {
+            Log.w("YTMusicRepository", "Failed to get playlist data from backend: ${e.localizedMessage}")
+        }
+
         val playlist = Playlist(id = playlistId, title = "Echo Top Charts", description = "Trending YouTube Music tracks")
         emit(Result.success(YTMusicPlaylistData(playlist = playlist, items = emptyList())))
     }
 
     fun getArtistData(artistId: String): Flow<Result<YTMusicArtistData>> = flow {
+        try {
+            val resp = AuroraApiClient.apiService.getArtist(artistId)
+            if (resp.isSuccessful && resp.body() != null) {
+                val detail = resp.body()!!
+                val artist = Artist(
+                    id = detail.id,
+                    name = detail.name,
+                    image = detail.thumbnail ?: ""
+                )
+                val topSongs = detail.songs.map { item ->
+                    Song(
+                        id = item.id,
+                        title = item.title,
+                        artist = detail.name,
+                        album = item.album ?: "Popular Track",
+                        duration = 210000L,
+                        artworkUrl = item.thumbnail ?: "",
+                        streamUrl = item.streamUrl ?: "",
+                        playbackAvailable = item.playbackAvailable,
+                        sourceProvider = "YouTubeMusic (ytmusicapi)"
+                    )
+                }
+                val albums = detail.albums.map { item ->
+                    Album(
+                        id = item.id,
+                        title = item.title,
+                        artistId = detail.id,
+                        artwork = item.thumbnail ?: "",
+                        releaseDate = System.currentTimeMillis(),
+                        totalTracks = 10
+                    )
+                }
+                emit(Result.success(YTMusicArtistData(artist = artist, topSongs = topSongs, albums = albums)))
+                return@flow
+            }
+        } catch (e: Exception) {
+            Log.w("YTMusicRepository", "Failed to get artist data from backend: ${e.localizedMessage}")
+        }
+
         val artist = Artist(id = artistId, name = "Featured Artist", image = "")
         emit(Result.success(YTMusicArtistData(artist = artist, topSongs = emptyList(), albums = emptyList())))
     }

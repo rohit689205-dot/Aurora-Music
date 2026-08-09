@@ -30,5 +30,10 @@ data class Song(
     // Kept for backward compatibility with existing UI
     val artist: String = "",
     val album: String = "",
-    val isLocal: Boolean = false
+    val isLocal: Boolean = false,
+
+    // Playback control and provider metadata
+    val playbackAvailable: Boolean = true,
+    val sourceProvider: String = "YouTubeMusic",
+    val isPreview: Boolean = false
 )

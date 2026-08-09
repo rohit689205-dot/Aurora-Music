@@ -22,7 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-object AudioPlayerManager : Player.Listener {
+object AudioPlayerManager : Player.Listener, PlaybackProvider {
 
     private var exoPlayer: ExoPlayer? = null
     private var applicationContext: Context? = null
@@ -102,13 +102,13 @@ object AudioPlayerManager : Player.Listener {
         _errorMessage.value = null
 
         // Pre-playback validation
-        if (song.id.isBlank() || song.title.isBlank() || song.artist.isBlank()) {
+        if (song.id.isBlank() || song.title.isBlank() || song.artist.isBlank() || !song.playbackAvailable || !validatePlayableUrl(song.streamUrl)) {
             player.stop()
             _isPlaying.value = false
             _isBuffering.value = false
             _playerStateName.value = "Unavailable"
-            _errorMessage.value = "Audio unavailable."
-            _lastDiagnosticLog.value = "Pre-playback validation failed: Incomplete track metadata."
+            _errorMessage.value = "Audio unavailable for this track."
+            _lastDiagnosticLog.value = "Pre-playback validation failed: Track '${song.title}' (ID: ${song.id}) has no authorized playable audio source."
             return
         }
 
@@ -118,7 +118,7 @@ object AudioPlayerManager : Player.Listener {
             _isPlaying.value = false
             _isBuffering.value = false
             _playerStateName.value = "Unavailable"
-            _errorMessage.value = "Playback unavailable for this track."
+            _errorMessage.value = "Audio unavailable for this track."
             _lastDiagnosticLog.value = "Audio unavailable: Missing or invalid playable audio URL for track '${song.title}' (ID: ${song.id})."
             return
         }
@@ -157,30 +157,28 @@ object AudioPlayerManager : Player.Listener {
         }
     }
 
+    override fun validatePlayableUrl(url: String): Boolean {
+        val trimmed = url.trim()
+        if (trimmed.isBlank()) return false
+        val lower = trimmed.lowercase()
+        if (lower.contains("youtube.com/watch") || lower.contains("youtu.be/")) return false
+        return lower.startsWith("http://") || lower.startsWith("https://") || lower.startsWith("content://") || lower.startsWith("file://")
+    }
+
     /**
      * Resolves playable URI. Returns null if URI is invalid, empty, or a non-direct web metadata URL (e.g. YouTube web links).
      */
-    fun resolvePlayableUri(song: Song): Uri? {
+    override fun resolvePlayableUri(song: Song): Uri? {
         val local = song.localPath?.trim()
         if (!local.isNullOrEmpty()) {
             return Uri.parse(local)
         }
 
         val url = song.streamUrl.trim()
-        if (url.startsWith("content://") || url.startsWith("file://")) {
-            return Uri.parse(url)
+        if (!validatePlayableUrl(url)) {
+            return null
         }
-
-        if (url.startsWith("http://") || url.startsWith("https://")) {
-            val lower = url.lowercase()
-            if (lower.contains("youtube.com/watch") || lower.contains("youtu.be/")) {
-                // Non-direct watch URL, needs stream extraction
-                return null
-            }
-            return Uri.parse(url)
-        }
-
-        return null
+        return Uri.parse(url)
     }
 
     /**

@@ -63,6 +63,12 @@ fun SettingsScreen(
     val debugLogging by viewModel.debugLogging.collectAsStateWithLifecycle()
     val mockDataMode by viewModel.mockDataMode.collectAsStateWithLifecycle()
 
+    val providerAudius by viewModel.providerAudius.collectAsStateWithLifecycle()
+    val providerJamendo by viewModel.providerJamendo.collectAsStateWithLifecycle()
+    val providerYtMusic by viewModel.providerYtMusic.collectAsStateWithLifecycle()
+    val providerLastFm by viewModel.providerLastFm.collectAsStateWithLifecycle()
+    val providerLrcLib by viewModel.providerLrcLib.collectAsStateWithLifecycle()
+
     var developerModeUnlockClicks by remember { mutableIntStateOf(0) }
     val isDeveloperMode = developerModeUnlockClicks >= 7
     val context = LocalContext.current
@@ -150,18 +156,41 @@ fun SettingsScreen(
         }
         
         item {
-            SettingsCategory("Audio")
-            SettingsItem(
-                icon = Icons.Rounded.HighQuality,
-                title = "Audio Quality",
-                subtitle = audioQuality,
-                onClick = { showAudioQualityDialog = true }
+            SettingsCategory("Music Providers")
+            SettingsSwitchItem(
+                icon = Icons.Rounded.Cloud,
+                title = "Audius",
+                subtitle = "Authorized streaming & search",
+                checked = providerAudius,
+                onCheckedChange = { viewModel.setProviderAudius(it) }
             )
-            SettingsItem(
-                icon = Icons.Rounded.Equalizer,
-                title = "Equalizer",
-                subtitle = "Preset: $equalizerPreset",
-                onClick = { showEqualizerDialog = true }
+            SettingsSwitchItem(
+                icon = Icons.Rounded.MusicNote,
+                title = "Jamendo",
+                subtitle = "Free music & authorized playback",
+                checked = providerJamendo,
+                onCheckedChange = { viewModel.setProviderJamendo(it) }
+            )
+            SettingsSwitchItem(
+                icon = Icons.Rounded.VideoLibrary,
+                title = "YouTube Music",
+                subtitle = "Metadata & discovery via ytmusicapi",
+                checked = providerYtMusic,
+                onCheckedChange = { viewModel.setProviderYtMusic(it) }
+            )
+            SettingsSwitchItem(
+                icon = Icons.Rounded.Insights,
+                title = "Last.fm",
+                subtitle = "Discovery, charts & artist metadata",
+                checked = providerLastFm,
+                onCheckedChange = { viewModel.setProviderLastFm(it) }
+            )
+            SettingsSwitchItem(
+                icon = Icons.Rounded.Subtitles,
+                title = "LRCLIB",
+                subtitle = "Synced & plain lyrics matching",
+                checked = providerLrcLib,
+                onCheckedChange = { viewModel.setProviderLrcLib(it) }
             )
         }
 
@@ -772,7 +801,7 @@ fun SettingsScreen(
         )
     }
 
-    // 9. Playback & Spotify Developer Diagnostics Dialog
+    // 9. Playback & Developer Diagnostics Dialog
     if (showDiagnosticsDialog) {
         val diagSong by com.example.playback.AudioPlayerManager.currentSong.collectAsStateWithLifecycle()
         val diagIsPlaying by com.example.playback.AudioPlayerManager.isPlaying.collectAsStateWithLifecycle()
@@ -795,6 +824,21 @@ fun SettingsScreen(
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(Spacing.S)
                 ) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(Spacing.M)) {
+                            Text("FastAPI / ytmusicapi Backend Diagnostics", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(Spacing.XS))
+                            Text("• Backend Base URL: ${com.example.data.api.AuroraApiClient.baseUrl}", style = MaterialTheme.typography.bodySmall)
+                            Text("• Current Provider: ytmusicapi (YouTube Music)", style = MaterialTheme.typography.bodySmall)
+                            Text("• Active Endpoints: /api/search, /api/charts, /api/songs, /api/artists, /api/albums, /api/playlists", style = MaterialTheme.typography.bodySmall)
+                            Text("• Status: Integrated & Online", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(Spacing.S))
+
                     Card(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     ) {

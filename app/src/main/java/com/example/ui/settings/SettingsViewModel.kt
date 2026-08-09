@@ -52,6 +52,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val debugLogging: StateFlow<Boolean> = getPreference(booleanPreferencesKey("debug_logging"), true)
     val mockDataMode: StateFlow<Boolean> = getPreference(booleanPreferencesKey("mock_data_mode"), false)
 
+    val providerAudius: StateFlow<Boolean> = getPreference(booleanPreferencesKey("provider_audius"), true)
+    val providerJamendo: StateFlow<Boolean> = getPreference(booleanPreferencesKey("provider_jamendo"), true)
+    val providerYtMusic: StateFlow<Boolean> = getPreference(booleanPreferencesKey("provider_ytmusic"), true)
+    val providerLastFm: StateFlow<Boolean> = getPreference(booleanPreferencesKey("provider_lastfm"), true)
+    val providerLrcLib: StateFlow<Boolean> = getPreference(booleanPreferencesKey("provider_lrclib"), true)
+
     private fun <T> getPreference(key: Preferences.Key<T>, defaultValue: T): StateFlow<T> {
         return dataStore.data.map { preferences ->
             preferences[key] ?: defaultValue
@@ -122,6 +128,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun setDebugLogging(value: Boolean) = setPreference(booleanPreferencesKey("debug_logging"), value)
     fun setMockDataMode(value: Boolean) = setPreference(booleanPreferencesKey("mock_data_mode"), value)
+
+    fun setProviderAudius(value: Boolean) = setPreference(booleanPreferencesKey("provider_audius"), value)
+    fun setProviderJamendo(value: Boolean) = setPreference(booleanPreferencesKey("provider_jamendo"), value)
+    fun setProviderYtMusic(value: Boolean) = setPreference(booleanPreferencesKey("provider_ytmusic"), value)
+    fun setProviderLastFm(value: Boolean) = setPreference(booleanPreferencesKey("provider_lastfm"), value)
+    fun setProviderLrcLib(value: Boolean) = setPreference(booleanPreferencesKey("provider_lrclib"), value)
 
     fun clearListeningHistory(onCleared: () -> Unit = {}) {
         viewModelScope.launch {
