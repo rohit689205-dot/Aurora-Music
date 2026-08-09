@@ -11,15 +11,59 @@ import com.example.data.MusicDatabase
 import com.example.data.MusicRepository
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import com.example.data.api.AuroraApiClient
+import com.example.data.api.model.AuroraHealthDto
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
     private val dataStore = application.dataStore
     private val repository = MusicRepository(MusicDatabase.getDatabase(application).songDao())
+
+    private val _healthStatus = MutableStateFlow<AuroraHealthDto?>(null)
+    val healthStatus: StateFlow<AuroraHealthDto?> = _healthStatus
+
+    private val _diagnostics = MutableStateFlow<com.example.data.api.model.AuroraDiagnosticsDto?>(null)
+    val diagnostics: StateFlow<com.example.data.api.model.AuroraDiagnosticsDto?> = _diagnostics
+
+    init {
+        checkBackendHealth()
+        loadDiagnostics()
+    }
+
+    fun checkBackendHealth() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val resp = AuroraApiClient.apiService.healthCheck()
+                if (resp.isSuccessful && resp.body() != null) {
+                    _healthStatus.value = resp.body()
+                } else {
+                    _healthStatus.value = AuroraHealthDto(status = "error", ytmusicapi = "error", message = "HTTP ${resp.code()}")
+                }
+            } catch (e: Exception) {
+                _healthStatus.value = AuroraHealthDto(status = "offline", ytmusicapi = "disconnected", message = e.localizedMessage)
+            }
+        }
+    }
+
+    fun loadDiagnostics() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val resp = AuroraApiClient.apiService.getDiagnostics()
+                if (resp.isSuccessful && resp.body() != null) {
+                    _diagnostics.value = resp.body()
+                }
+            } catch (e: Exception) {
+                // Ignore or handle
+            }
+        }
+    }
+
 
     val themeMode: StateFlow<String> = getPreference(stringPreferencesKey("theme_mode"), "System Default")
     val uiDensity: StateFlow<String> = getPreference(stringPreferencesKey("ui_density"), "Comfortable")

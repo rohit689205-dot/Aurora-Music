@@ -45,4 +45,7 @@ interface AuroraApiService {
 
     @GET("api/diagnostics")
     suspend fun getDiagnostics(): Response<AuroraDiagnosticsDto>
+
+    @GET("health")
+    suspend fun healthCheck(): Response<AuroraHealthDto>
 }

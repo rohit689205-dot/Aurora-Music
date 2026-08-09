@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -59,6 +60,8 @@ fun SettingsScreen(
     val playbackNotifications by viewModel.playbackNotifications.collectAsStateWithLifecycle()
     val newRecommendations by viewModel.newRecommendations.collectAsStateWithLifecycle()
     val largeText by viewModel.largeText.collectAsStateWithLifecycle()
+    val healthStatus by viewModel.healthStatus.collectAsStateWithLifecycle()
+    val diagnostics by viewModel.diagnostics.collectAsStateWithLifecycle()
 
     val debugLogging by viewModel.debugLogging.collectAsStateWithLifecycle()
     val mockDataMode by viewModel.mockDataMode.collectAsStateWithLifecycle()
@@ -832,8 +835,67 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.height(Spacing.XS))
                             Text("• Backend Base URL: ${com.example.data.api.AuroraApiClient.baseUrl}", style = MaterialTheme.typography.bodySmall)
                             Text("• Current Provider: ytmusicapi (YouTube Music)", style = MaterialTheme.typography.bodySmall)
-                            Text("• Active Endpoints: /api/search, /api/charts, /api/songs, /api/artists, /api/albums, /api/playlists", style = MaterialTheme.typography.bodySmall)
-                            Text("• Status: Integrated & Online", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                            Text("• Health Status: ${healthStatus?.status?.uppercase() ?: "CHECKING..."}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = if (healthStatus?.status == "ok") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                            Text("• ytmusicapi Connectivity: ${healthStatus?.ytmusicapi ?: "unknown"}", style = MaterialTheme.typography.bodySmall)
+                            if (!healthStatus?.message.isNullOrBlank()) {
+                                Text("• Message: ${healthStatus?.message}", style = MaterialTheme.typography.bodySmall)
+                            }
+                            Text("• Active Endpoints: /health, /api/search, /api/charts, /api/songs, /api/artists, /api/albums, /api/playlists", style = MaterialTheme.typography.bodySmall)
+                            Spacer(modifier = Modifier.height(Spacing.S))
+                            OutlinedButton(
+                                onClick = { viewModel.checkBackendHealth() },
+                                modifier = Modifier.fillMaxWidth().testTag("refresh_health_button")
+                            ) {
+                                Text("Refresh Health Check")
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(Spacing.S))
+
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(Spacing.M)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Last 5 API Requests (URL, Latency, Status)", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                IconButton(onClick = { viewModel.loadDiagnostics() }, modifier = Modifier.size(32.dp).testTag("refresh_diagnostics_btn")) {
+                                    Icon(Icons.Rounded.Refresh, contentDescription = "Refresh Diagnostics", modifier = Modifier.size(18.dp))
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(Spacing.XS))
+                            val recentReqs = diagnostics?.recentRequests ?: emptyList()
+                            if (recentReqs.isEmpty()) {
+                                Text("No recent requests recorded yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            } else {
+                                recentReqs.forEachIndexed { index, req ->
+                                    Spacer(modifier = Modifier.height(Spacing.XS))
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(Spacing.S)) {
+                                            Text("${index + 1}. [${req.method}] ${req.url}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text("Status: ${req.httpStatus}", style = MaterialTheme.typography.bodySmall, color = if (req.httpStatus in 200..299) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
+                                                Text("Latency: ${String.format("%.1f", req.latencyMs)} ms", style = MaterialTheme.typography.bodySmall)
+                                            }
+                                            if (!req.error.isNullOrBlank()) {
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text("Error: ${req.error}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 

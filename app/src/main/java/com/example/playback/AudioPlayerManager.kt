@@ -107,7 +107,7 @@ object AudioPlayerManager : Player.Listener, PlaybackProvider {
             _isPlaying.value = false
             _isBuffering.value = false
             _playerStateName.value = "Unavailable"
-            _errorMessage.value = "Audio unavailable for this track."
+            _errorMessage.value = "Playback unavailable for this track."
             _lastDiagnosticLog.value = "Pre-playback validation failed: Track '${song.title}' (ID: ${song.id}) has no authorized playable audio source."
             return
         }
@@ -118,7 +118,7 @@ object AudioPlayerManager : Player.Listener, PlaybackProvider {
             _isPlaying.value = false
             _isBuffering.value = false
             _playerStateName.value = "Unavailable"
-            _errorMessage.value = "Audio unavailable for this track."
+            _errorMessage.value = "Playback unavailable for this track."
             _lastDiagnosticLog.value = "Audio unavailable: Missing or invalid playable audio URL for track '${song.title}' (ID: ${song.id})."
             return
         }

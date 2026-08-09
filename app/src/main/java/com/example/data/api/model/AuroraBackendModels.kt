@@ -77,6 +77,15 @@ data class AuroraLyricsDto(
 )
 
 @JsonClass(generateAdapter = true)
+data class ApiRequestLogDto(
+    @Json(name = "url") val url: String = "",
+    @Json(name = "method") val method: String = "GET",
+    @Json(name = "httpStatus") val httpStatus: Int = 200,
+    @Json(name = "latencyMs") val latencyMs: Double = 0.0,
+    @Json(name = "error") val error: String? = null
+)
+
+@JsonClass(generateAdapter = true)
 data class AuroraDiagnosticsDto(
     @Json(name = "backendStatus") val backendStatus: String = "offline",
     @Json(name = "lastRequest") val lastRequest: String = "",
@@ -84,5 +93,16 @@ data class AuroraDiagnosticsDto(
     @Json(name = "resultCount") val resultCount: Int = 0,
     @Json(name = "searchLatencyMs") val searchLatencyMs: Double = 0.0,
     @Json(name = "lastError") val lastError: String? = null,
-    @Json(name = "currentProvider") val currentProvider: String = "ytmusicapi"
+    @Json(name = "currentProvider") val currentProvider: String = "ytmusicapi",
+    @Json(name = "recentRequests") val recentRequests: List<ApiRequestLogDto> = emptyList()
+)
+
+
+@JsonClass(generateAdapter = true)
+data class AuroraHealthDto(
+    @Json(name = "status") val status: String = "offline",
+    @Json(name = "ytmusicapi") val ytmusicapi: String = "unknown",
+    @Json(name = "service") val service: String = "",
+    @Json(name = "version") val version: String = "",
+    @Json(name = "message") val message: String? = null
 )

@@ -282,4 +282,13 @@ class YTMusicClient:
             logger.error(f"get_lyrics failed for '{video_id}': {e}")
             return LyricsResponse(lyrics=None, available=False)
 
+    def health_check(self) -> Dict[str, Any]:
+        if not self.yt:
+            return {"status": "error", "ytmusicapi": "disconnected", "message": "YTMusic client not initialized"}
+        try:
+            self.yt.search("test", limit=1)
+            return {"status": "ok", "ytmusicapi": "connected", "service": "Aurora Music Backend", "version": "1.0.0"}
+        except Exception as e:
+            return {"status": "degraded", "ytmusicapi": "error", "message": str(e)}
+
 ytmusic_client = YTMusicClient()

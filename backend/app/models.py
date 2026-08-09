@@ -60,6 +60,13 @@ class LyricsResponse(BaseModel):
     lyrics: Optional[str] = None
     available: bool = False
 
+class ApiRequestLog(BaseModel):
+    url: str
+    method: str
+    httpStatus: int
+    latencyMs: float
+    error: Optional[str] = None
+
 class DiagnosticsStatus(BaseModel):
     backendStatus: str = "online"
     lastRequest: str = "N/A"
@@ -68,3 +75,5 @@ class DiagnosticsStatus(BaseModel):
     searchLatencyMs: float = 0.0
     lastError: Optional[str] = None
     currentProvider: str = "ytmusicapi"
+    recentRequests: List[ApiRequestLog] = []
+
