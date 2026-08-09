@@ -54,11 +54,23 @@ class HomeViewModel(
         viewModelScope.launch {
             _homeState.value = UiState.Loading
             try {
-                val queryPrefix = mood ?: genre ?: "Indian trending"
+                // 1. Health check first
+                try {
+                    val healthResp = com.example.data.api.AuroraApiClient.apiService.healthCheck()
+                    if (!healthResp.isSuccessful || healthResp.body()?.status != "ok") {
+                        _homeState.value = UiState.Error("Aurora Music server is offline.")
+                        return@launch
+                    }
+                } catch (e: Exception) {
+                    _homeState.value = UiState.Error("Aurora Music server is offline.")
+                    return@launch
+                }
 
-                val trendingResult = unifiedRepository.searchAll("Indian trending hits")
+                val queryPrefix = mood ?: genre ?: "Arijit Singh"
+
+                val trendingResult = unifiedRepository.searchAll(queryPrefix)
                 val popularResult = unifiedRepository.searchAll("Popular in India")
-                val hindiResult = unifiedRepository.searchAll(if (mood != null || genre != null) queryPrefix else "Hindi hit songs")
+                val hindiResult = unifiedRepository.searchAll("Hindi hit songs")
                 val punjabiResult = unifiedRepository.searchAll("Punjabi hit songs")
                 val bollywoodResult = unifiedRepository.searchAll("Bollywood film music")
 
@@ -100,7 +112,7 @@ class HomeViewModel(
                 }
             } catch (e: Exception) {
                 _homeState.value = UiState.Error(
-                    e.localizedMessage ?: "Failed to connect to music service. Please check your connection."
+                    e.localizedMessage ?: "Unable to load music."
                 )
             }
         }

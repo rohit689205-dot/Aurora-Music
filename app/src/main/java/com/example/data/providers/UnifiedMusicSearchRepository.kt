@@ -12,18 +12,12 @@ class UnifiedMusicSearchRepository(
     private val ytMusicRepository: YTMusicRepository = YTMusicRepository()
 ) {
     suspend fun searchAll(query: String): YTMusicSearchResult = coroutineScope {
-        if (query.isBlank()) {
-            val chartResult = ytMusicRepository.getCharts("Trending").getOrNull() ?: emptyList()
-            return@coroutineScope YTMusicSearchResult(
-                songs = chartResult,
-                artists = emptyList(),
-                albums = emptyList(),
-                playlists = emptyList()
-            )
+        val q = query.ifBlank { "Arijit Singh" }
+        val result = ytMusicRepository.search(q)
+        if (result.isFailure) {
+            throw result.exceptionOrNull() ?: Exception("Failed to search music")
         }
-
-        val result = ytMusicRepository.search(query)
-        result.getOrNull() ?: YTMusicSearchResult()
+        result.getOrThrow()
     }
 
     suspend fun getHomeCharts(category: String): List<Song> = coroutineScope {

@@ -86,7 +86,7 @@ class YTMusicClient:
             )
         except Exception as e:
             logger.error(f"Search failed for query '{query}': {e}")
-            return SearchResponse()
+            raise e
 
     def get_song(self, video_id: str) -> Optional[SongDetail]:
         if not self.yt:

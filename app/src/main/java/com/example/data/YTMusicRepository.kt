@@ -61,7 +61,6 @@ class YTMusicRepository : MusicProvider {
             return@withContext Result.success(YTMusicSearchResult())
         }
 
-        // 1. Try FastAPI backend (ytmusicapi)
         try {
             val auroraResp = AuroraApiClient.apiService.search(trimmed)
             if (auroraResp.isSuccessful && auroraResp.body() != null) {
@@ -113,68 +112,21 @@ class YTMusicRepository : MusicProvider {
                     )
                 }
 
-                if (songs.isNotEmpty() || artists.isNotEmpty() || albums.isNotEmpty() || playlists.isNotEmpty()) {
-                    return@withContext Result.success(
-                        YTMusicSearchResult(
-                            songs = songs,
-                            artists = artists,
-                            albums = albums,
-                            playlists = playlists
-                        )
+                return@withContext Result.success(
+                    YTMusicSearchResult(
+                        songs = songs,
+                        artists = artists,
+                        albums = albums,
+                        playlists = playlists
                     )
-                }
+                )
+            } else {
+                val errorMsg = auroraResp.errorBody()?.string() ?: "HTTP error ${auroraResp.code()}"
+                return@withContext Result.failure(Exception("Aurora Backend search error: $errorMsg"))
             }
         } catch (e: Exception) {
-            Log.w("YTMusicRepository", "Aurora Backend query failed, falling back to InnerTube: ${e.localizedMessage}")
-        }
-
-        // 2. Direct InnerTube fallback
-        try {
-            val ytRequest = InnertubeSearchRequest(
-                context = YTMusicApiClient.createSearchContext(),
-                query = trimmed
-            )
-            val ytResp = apiService.search(ytRequest)
-            val ytSongs = mutableListOf<Song>()
-
-            if (ytResp.isSuccessful && ytResp.body() != null) {
-                val jsonString = ytResp.body()!!.string()
-                val parsedYtSongs = parseInnertubeSearch(jsonString)
-                ytSongs.addAll(parsedYtSongs)
-            }
-
-            val artists = ytSongs.map { it.artist }.distinct().take(5).map { artistName ->
-                Artist(
-                    id = "artist_${artistName.hashCode()}",
-                    name = artistName,
-                    image = ytSongs.firstOrNull { it.artist == artistName }?.artworkUrl ?: ""
-                )
-            }
-
-            val albums = ytSongs.map { it.album }.distinct().take(5).map { albumName ->
-                val sample = ytSongs.firstOrNull { it.album == albumName }
-                Album(
-                    id = "album_${albumName.hashCode()}",
-                    title = albumName,
-                    artistId = "artist_${sample?.artist?.hashCode()}",
-                    artwork = sample?.artworkUrl ?: "",
-                    releaseDate = System.currentTimeMillis(),
-                    totalTracks = 10
-                )
-            }
-
-            Result.success(
-                YTMusicSearchResult(
-                    songs = ytSongs,
-                    artists = artists,
-                    albums = albums,
-                    playlists = emptyList()
-                )
-            )
-
-        } catch (e: Exception) {
-            Log.e("YTMusicRepository", "InnerTube Search error", e)
-            Result.failure(e)
+            Log.e("YTMusicRepository", "Aurora Backend search failed: ${e.localizedMessage}", e)
+            return@withContext Result.failure(e)
         }
     }
 
