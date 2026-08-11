@@ -66,10 +66,6 @@ fun SettingsScreen(
     val debugLogging by viewModel.debugLogging.collectAsStateWithLifecycle()
     val mockDataMode by viewModel.mockDataMode.collectAsStateWithLifecycle()
 
-    val providerAudius by viewModel.providerAudius.collectAsStateWithLifecycle()
-    val providerJamendo by viewModel.providerJamendo.collectAsStateWithLifecycle()
-    val providerYtMusic by viewModel.providerYtMusic.collectAsStateWithLifecycle()
-    val providerLastFm by viewModel.providerLastFm.collectAsStateWithLifecycle()
     val providerLrcLib by viewModel.providerLrcLib.collectAsStateWithLifecycle()
 
     var developerModeUnlockClicks by remember { mutableIntStateOf(0) }
@@ -160,34 +156,6 @@ fun SettingsScreen(
         
         item {
             SettingsCategory("Music Providers")
-            SettingsSwitchItem(
-                icon = Icons.Rounded.Cloud,
-                title = "Audius",
-                subtitle = "Authorized streaming & search",
-                checked = providerAudius,
-                onCheckedChange = { viewModel.setProviderAudius(it) }
-            )
-            SettingsSwitchItem(
-                icon = Icons.Rounded.MusicNote,
-                title = "Jamendo",
-                subtitle = "Free music & authorized playback",
-                checked = providerJamendo,
-                onCheckedChange = { viewModel.setProviderJamendo(it) }
-            )
-            SettingsSwitchItem(
-                icon = Icons.Rounded.VideoLibrary,
-                title = "YouTube Music",
-                subtitle = "Metadata & discovery via ytmusicapi",
-                checked = providerYtMusic,
-                onCheckedChange = { viewModel.setProviderYtMusic(it) }
-            )
-            SettingsSwitchItem(
-                icon = Icons.Rounded.Insights,
-                title = "Last.fm",
-                subtitle = "Discovery, charts & artist metadata",
-                checked = providerLastFm,
-                onCheckedChange = { viewModel.setProviderLastFm(it) }
-            )
             SettingsSwitchItem(
                 icon = Icons.Rounded.Subtitles,
                 title = "LRCLIB",
@@ -793,7 +761,6 @@ fun SettingsScreen(
                     Text("• Room Database (Apache 2.0)")
                     Text("• Retrofit & OkHttp (Apache 2.0)")
                     Text("• Coil Image Loading (Apache 2.0)")
-                    Text("• Innertube YouTube Music Engine")
                 }
             },
             confirmButton = {
@@ -831,22 +798,17 @@ fun SettingsScreen(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     ) {
                         Column(modifier = Modifier.padding(Spacing.M)) {
-                            Text("FastAPI / ytmusicapi Backend Diagnostics", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                            Text("Local Music Source Diagnostics", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(Spacing.XS))
-                            Text("• Backend Base URL: ${com.example.data.api.AuroraApiClient.baseUrl}", style = MaterialTheme.typography.bodySmall)
-                            Text("• Current Provider: ytmusicapi (YouTube Music)", style = MaterialTheme.typography.bodySmall)
-                            Text("• Health Status: ${healthStatus?.status?.uppercase() ?: "CHECKING..."}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = if (healthStatus?.status == "ok") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
-                            Text("• ytmusicapi Connectivity: ${healthStatus?.ytmusicapi ?: "unknown"}", style = MaterialTheme.typography.bodySmall)
-                            if (!healthStatus?.message.isNullOrBlank()) {
-                                Text("• Message: ${healthStatus?.message}", style = MaterialTheme.typography.bodySmall)
-                            }
-                            Text("• Active Endpoints: /health, /api/search, /api/charts, /api/songs, /api/artists, /api/albums, /api/playlists", style = MaterialTheme.typography.bodySmall)
+                            Text("• Music Source: Android MediaStore & Local Library", style = MaterialTheme.typography.bodySmall)
+                            Text("• Status: ${healthStatus?.status?.uppercase() ?: "OK"}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Text("• Message: ${healthStatus?.message ?: "Local MediaStore Active"}", style = MaterialTheme.typography.bodySmall)
                             Spacer(modifier = Modifier.height(Spacing.S))
                             OutlinedButton(
                                 onClick = { viewModel.checkBackendHealth() },
                                 modifier = Modifier.fillMaxWidth().testTag("refresh_health_button")
                             ) {
-                                Text("Refresh Health Check")
+                                Text("Refresh Status")
                             }
                         }
                     }
@@ -856,46 +818,34 @@ fun SettingsScreen(
                     Card(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     ) {
+                        val isConfigured by com.example.data.api.SpotifyDiagnostics.spotifyConfigured.collectAsStateWithLifecycle()
+                        val isReachable by com.example.data.api.SpotifyDiagnostics.apiReachable.collectAsStateWithLifecycle()
+                        val lastStatus by com.example.data.api.SpotifyDiagnostics.lastHttpStatus.collectAsStateWithLifecycle()
+                        val lastEp by com.example.data.api.SpotifyDiagnostics.lastEndpoint.collectAsStateWithLifecycle()
+                        val resCount by com.example.data.api.SpotifyDiagnostics.resultCount.collectAsStateWithLifecycle()
+                        val lastErr by com.example.data.api.SpotifyDiagnostics.lastError.collectAsStateWithLifecycle()
+
                         Column(modifier = Modifier.padding(Spacing.M)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("Last 5 API Requests (URL, Latency, Status)", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                                IconButton(onClick = { viewModel.loadDiagnostics() }, modifier = Modifier.size(32.dp).testTag("refresh_diagnostics_btn")) {
-                                    Icon(Icons.Rounded.Refresh, contentDescription = "Refresh Diagnostics", modifier = Modifier.size(18.dp))
-                                }
-                            }
+                            Text("Music API Diagnostics", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.height(Spacing.XS))
-                            val recentReqs = diagnostics?.recentRequests ?: emptyList()
-                            if (recentReqs.isEmpty()) {
-                                Text("No recent requests recorded yet.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            } else {
-                                recentReqs.forEachIndexed { index, req ->
-                                    Spacer(modifier = Modifier.height(Spacing.XS))
-                                    Card(
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f)),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Column(modifier = Modifier.padding(Spacing.S)) {
-                                            Text("${index + 1}. [${req.method}] ${req.url}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
-                                                Text("Status: ${req.httpStatus}", style = MaterialTheme.typography.bodySmall, color = if (req.httpStatus in 200..299) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)
-                                                Text("Latency: ${String.format("%.1f", req.latencyMs)} ms", style = MaterialTheme.typography.bodySmall)
-                                            }
-                                            if (!req.error.isNullOrBlank()) {
-                                                Spacer(modifier = Modifier.height(2.dp))
-                                                Text("Error: ${req.error}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            Text("• API configured: ${if (isConfigured) "YES" else "NO"}", style = MaterialTheme.typography.bodySmall)
+                            Text("• API reachable: ${if (isReachable) "YES" else "NO"}", style = MaterialTheme.typography.bodySmall)
+                            Text("• Last HTTP status: ${lastStatus ?: "N/A"}", style = MaterialTheme.typography.bodySmall)
+                            Text("• Last endpoint: ${lastEp ?: "N/A"}", style = MaterialTheme.typography.bodySmall)
+                            Text("• Result count: $resCount", style = MaterialTheme.typography.bodySmall)
+                            Text("• Last error: ${lastErr ?: "None"}", style = MaterialTheme.typography.bodySmall, color = if (lastErr != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(Spacing.S))
+
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(Spacing.M)) {
+                            Text("Local Storage & Library Info", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.height(Spacing.XS))
+                            Text("No external network requests are made. All music playback is served from device MediaStore or local library storage.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
 

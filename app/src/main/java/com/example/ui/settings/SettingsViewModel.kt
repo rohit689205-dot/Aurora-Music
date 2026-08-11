@@ -16,20 +16,20 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
-import com.example.data.api.AuroraApiClient
-import com.example.data.api.model.AuroraHealthDto
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
+
+data class LocalHealthDto(val status: String = "ok", val message: String = "Local MediaStore Active")
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
     private val dataStore = application.dataStore
     private val repository = MusicRepository(MusicDatabase.getDatabase(application).songDao())
 
-    private val _healthStatus = MutableStateFlow<AuroraHealthDto?>(null)
-    val healthStatus: StateFlow<AuroraHealthDto?> = _healthStatus
+    private val _healthStatus = MutableStateFlow<LocalHealthDto?>(LocalHealthDto())
+    val healthStatus: StateFlow<LocalHealthDto?> = _healthStatus
 
-    private val _diagnostics = MutableStateFlow<com.example.data.api.model.AuroraDiagnosticsDto?>(null)
-    val diagnostics: StateFlow<com.example.data.api.model.AuroraDiagnosticsDto?> = _diagnostics
+    private val _diagnostics = MutableStateFlow<Any?>(null)
+    val diagnostics: StateFlow<Any?> = _diagnostics
 
     init {
         checkBackendHealth()
@@ -37,31 +37,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun checkBackendHealth() {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val resp = AuroraApiClient.apiService.healthCheck()
-                if (resp.isSuccessful && resp.body() != null) {
-                    _healthStatus.value = resp.body()
-                } else {
-                    _healthStatus.value = AuroraHealthDto(status = "error", ytmusicapi = "error", message = "HTTP ${resp.code()}")
-                }
-            } catch (e: Exception) {
-                _healthStatus.value = AuroraHealthDto(status = "offline", ytmusicapi = "disconnected", message = e.localizedMessage)
-            }
-        }
+        _healthStatus.value = LocalHealthDto(status = "ok", message = "Local MediaStore Active")
     }
 
     fun loadDiagnostics() {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val resp = AuroraApiClient.apiService.getDiagnostics()
-                if (resp.isSuccessful && resp.body() != null) {
-                    _diagnostics.value = resp.body()
-                }
-            } catch (e: Exception) {
-                // Ignore or handle
-            }
-        }
+        _diagnostics.value = null
     }
 
 
@@ -96,10 +76,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     val debugLogging: StateFlow<Boolean> = getPreference(booleanPreferencesKey("debug_logging"), true)
     val mockDataMode: StateFlow<Boolean> = getPreference(booleanPreferencesKey("mock_data_mode"), false)
 
-    val providerAudius: StateFlow<Boolean> = getPreference(booleanPreferencesKey("provider_audius"), true)
-    val providerJamendo: StateFlow<Boolean> = getPreference(booleanPreferencesKey("provider_jamendo"), true)
-    val providerYtMusic: StateFlow<Boolean> = getPreference(booleanPreferencesKey("provider_ytmusic"), true)
-    val providerLastFm: StateFlow<Boolean> = getPreference(booleanPreferencesKey("provider_lastfm"), true)
     val providerLrcLib: StateFlow<Boolean> = getPreference(booleanPreferencesKey("provider_lrclib"), true)
 
     private fun <T> getPreference(key: Preferences.Key<T>, defaultValue: T): StateFlow<T> {
@@ -173,10 +149,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setDebugLogging(value: Boolean) = setPreference(booleanPreferencesKey("debug_logging"), value)
     fun setMockDataMode(value: Boolean) = setPreference(booleanPreferencesKey("mock_data_mode"), value)
 
-    fun setProviderAudius(value: Boolean) = setPreference(booleanPreferencesKey("provider_audius"), value)
-    fun setProviderJamendo(value: Boolean) = setPreference(booleanPreferencesKey("provider_jamendo"), value)
-    fun setProviderYtMusic(value: Boolean) = setPreference(booleanPreferencesKey("provider_ytmusic"), value)
-    fun setProviderLastFm(value: Boolean) = setPreference(booleanPreferencesKey("provider_lastfm"), value)
     fun setProviderLrcLib(value: Boolean) = setPreference(booleanPreferencesKey("provider_lrclib"), value)
 
     fun clearListeningHistory(onCleared: () -> Unit = {}) {

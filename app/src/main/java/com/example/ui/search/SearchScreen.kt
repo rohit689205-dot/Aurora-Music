@@ -14,6 +14,7 @@ import androidx.compose.material.icons.rounded.Album
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.PlaylistPlay
@@ -56,6 +57,18 @@ fun SearchScreen(
     val selectedFilter by viewModel.selectedFilter.collectAsStateWithLifecycle()
     val searchState by viewModel.searchState.collectAsStateWithLifecycle()
     val isLoadingMore by viewModel.isLoadingMore.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    val speechLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val spokenText = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.getOrNull(0)
+            if (!spokenText.isNullOrEmpty()) {
+                viewModel.onQueryChanged(spokenText)
+            }
+        }
+    }
 
     var selectedSongForDetails by remember { mutableStateOf<Song?>(null) }
     val defaultSuggestions = listOf("Top Tracks 2026", "Arijit Singh", "Lofi Beats", "Synthwave Hits", "Chillout Playlist")
@@ -81,12 +94,34 @@ fun SearchScreen(
                         shape = RoundedCornerShape(24.dp),
                         singleLine = true,
                         trailingIcon = {
-                            if (query.isNotEmpty()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (query.isNotEmpty()) {
+                                    IconButton(
+                                        onClick = { viewModel.onQueryChanged("") },
+                                        modifier = Modifier.testTag("clear_search_btn")
+                                    ) {
+                                        Icon(Icons.Rounded.Close, contentDescription = "Clear")
+                                    }
+                                }
                                 IconButton(
-                                    onClick = { viewModel.onQueryChanged("") },
-                                    modifier = Modifier.testTag("clear_search_btn")
+                                    onClick = {
+                                        val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                            putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                            putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Speak song or artist name...")
+                                        }
+                                        try {
+                                            speechLauncher.launch(intent)
+                                        } catch (e: Exception) {
+                                            android.widget.Toast.makeText(context, "Voice input not supported on this device", android.widget.Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    modifier = Modifier.testTag("search_mic_btn")
                                 ) {
-                                    Icon(Icons.Rounded.Close, contentDescription = "Clear")
+                                    Icon(
+                                        Icons.Rounded.Mic,
+                                        contentDescription = "Voice Search",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
                                 }
                             }
                         }

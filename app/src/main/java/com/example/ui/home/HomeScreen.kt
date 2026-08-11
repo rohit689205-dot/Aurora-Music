@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
@@ -27,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -55,7 +57,20 @@ fun HomeScreen(
     modifier: Modifier = Modifier
 ) {
     val homeState by viewModel.homeState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val density = LocalAppDensity.current
+
+    val speechLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val spokenText = result.data?.getStringArrayListExtra(android.speech.RecognizerIntent.EXTRA_RESULTS)?.getOrNull(0)
+            if (!spokenText.isNullOrEmpty()) {
+                android.widget.Toast.makeText(context, "Searching for: $spokenText", android.widget.Toast.LENGTH_SHORT).show()
+                onNavigateToSearch()
+            }
+        }
+    }
 
     var selectedSongForOptions by remember { mutableStateOf<Song?>(null) }
 
@@ -139,8 +154,30 @@ fun HomeScreen(
                         Text(
                             text = "Search Indian songs, artists, albums...",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f)
                         )
+                        IconButton(
+                            onClick = {
+                                val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                    putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                    putExtra(android.speech.RecognizerIntent.EXTRA_PROMPT, "Speak to search Indian songs...")
+                                }
+                                try {
+                                    speechLauncher.launch(intent)
+                                } catch (e: Exception) {
+                                    android.widget.Toast.makeText(context, "Voice search not supported on this device", android.widget.Toast.LENGTH_SHORT).show()
+                                    onNavigateToSearch()
+                                }
+                            },
+                            modifier = Modifier.testTag("home_mic_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Mic,
+                                contentDescription = "Voice Search",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }
@@ -148,7 +185,7 @@ fun HomeScreen(
 
         // MOOD CHIPS
         item {
-            val selectedMood = (homeState as? UiState.Success)?.data?.selectedMood
+            val selectedMood = (homeState as? HomeUiState.Success)?.data?.selectedMood
             LazyRow(
                 contentPadding = PaddingValues(horizontal = Spacing.XL, vertical = Spacing.S),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.M)
@@ -185,10 +222,10 @@ fun HomeScreen(
         }
 
         when (val state = homeState) {
-            is UiState.Loading -> {
+            is HomeUiState.Loading -> {
                 item {
                     Column(modifier = Modifier.padding(horizontal = Spacing.XL)) {
-                        Text(text = "Loading Indian Music...", style = MaterialTheme.typography.titleMedium)
+                        Text(text = "Loading music...", style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(Spacing.M))
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.L)) {
                             items(4) { SkeletonMusicCard() }
@@ -196,41 +233,21 @@ fun HomeScreen(
                     }
                 }
             }
-            is UiState.Error -> {
+            is HomeUiState.Error -> {
                 item {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = Spacing.XL, vertical = Spacing.L),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f))
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(Spacing.L),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = state.message,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.error,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(Spacing.M))
-                            Button(onClick = { viewModel.retry() }) {
-                                Icon(Icons.Rounded.Refresh, contentDescription = "Retry", modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(Spacing.S))
-                                Text("Retry")
-                            }
-                        }
-                    }
+                    MusicErrorCard(
+                        title = state.message,
+                        message = "Please check your connection and try again.",
+                        buttonText = "Retry",
+                        onClick = { viewModel.retry() }
+                    )
                 }
             }
-            is UiState.Empty -> {
+            is HomeUiState.Empty -> {
                 item {
                     Box(modifier = Modifier.fillMaxWidth().padding(Spacing.XXL), contentAlignment = Alignment.Center) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("No music available right now.", style = MaterialTheme.typography.bodyLarge)
+                            Text("No music found.", style = MaterialTheme.typography.bodyLarge)
                             Spacer(modifier = Modifier.height(Spacing.M))
                             Button(onClick = { viewModel.retry() }) {
                                 Text("Retry")
@@ -239,7 +256,7 @@ fun HomeScreen(
                     }
                 }
             }
-            is UiState.Success -> {
+            is HomeUiState.Success -> {
                 val data = state.data
 
                 // 2. INDIAN TRENDING
@@ -626,3 +643,55 @@ fun SongOptionsBottomSheet(
         }
     }
 }
+
+@Composable
+fun MusicErrorCard(
+    title: String,
+    message: String,
+    buttonText: String = "Retry",
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.XL, vertical = Spacing.XL),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Spacing.XL),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                Icons.Rounded.MusicNote,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(Spacing.M))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(Spacing.S))
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(Spacing.L))
+            Button(
+                onClick = onClick,
+                modifier = Modifier.testTag("music_error_button")
+            ) {
+                Text(buttonText)
+            }
+        }
+    }
+}
+

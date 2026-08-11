@@ -1,18 +1,19 @@
 package com.example.ui.playlist
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.MusicDatabase
+import com.example.data.MusicRepository
 import com.example.data.YTMusicPlaylistData
-import com.example.data.YTMusicRepository
 import com.example.ui.state.UiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-class PlaylistViewModel(
-    private val repository: YTMusicRepository = YTMusicRepository()
-) : ViewModel() {
+class PlaylistViewModel(application: Application) : AndroidViewModel(application) {
+    private val repository = MusicRepository(MusicDatabase.getDatabase(application).songDao())
 
     private val _playlistState = MutableStateFlow<UiState<YTMusicPlaylistData>>(UiState.Loading)
     val playlistState: StateFlow<UiState<YTMusicPlaylistData>> = _playlistState.asStateFlow()
@@ -23,7 +24,7 @@ class PlaylistViewModel(
         currentPlaylistId = playlistId
         viewModelScope.launch {
             _playlistState.value = UiState.Loading
-            repository.getPlaylistData(playlistId = playlistId).collect { result ->
+            repository.getPlaylistData(getApplication(), playlistId).collect { result ->
                 result.fold(
                     onSuccess = { data ->
                         _playlistState.value = UiState.Success(data)

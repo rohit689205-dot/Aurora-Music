@@ -12,24 +12,25 @@ import com.example.ui.settings.SettingsViewModel
 import com.example.ui.theme.AuroraTheme
 
 class MainActivity : ComponentActivity() {
-  override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
-    enableEdgeToEdge()
-    setContent {
-      val settingsViewModel: SettingsViewModel = viewModel()
-      val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
-      val uiDensity by settingsViewModel.uiDensity.collectAsStateWithLifecycle()
-      val accentColor by settingsViewModel.accentColor.collectAsStateWithLifecycle()
-      val dynamicColor by settingsViewModel.dynamicColor.collectAsStateWithLifecycle()
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        com.example.data.auth.AuthManager.init(applicationContext)
+        enableEdgeToEdge()
+        setContent {
+            val settingsViewModel: SettingsViewModel = viewModel()
+            val themeMode by settingsViewModel.themeMode.collectAsStateWithLifecycle()
+            val uiDensity by settingsViewModel.uiDensity.collectAsStateWithLifecycle()
+            val accentColor by settingsViewModel.accentColor.collectAsStateWithLifecycle()
+            val dynamicColor by settingsViewModel.dynamicColor.collectAsStateWithLifecycle()
 
-      AuroraTheme(
-        themeMode = themeMode,
-        uiDensity = uiDensity,
-        accentColor = accentColor,
-        dynamicColor = dynamicColor
-      ) {
-        AuroraApp()
-      }
+            AuroraTheme(
+                themeMode = themeMode,
+                uiDensity = uiDensity,
+                accentColor = accentColor,
+                dynamicColor = dynamicColor
+            ) {
+                AuroraApp()
+            }
+        }
     }
-  }
 }

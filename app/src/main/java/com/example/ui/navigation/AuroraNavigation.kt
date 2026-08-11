@@ -126,7 +126,7 @@ fun AuroraApp(
         Box(modifier = Modifier.fillMaxSize()) {
             NavHost(
                 navController = navController,
-                startDestination = "splash",
+                startDestination = Screen.Home.route,
                 modifier = Modifier.padding(innerPadding)
             ) {
                 composable("splash") {
@@ -182,9 +182,17 @@ fun AuroraApp(
                         onBack = { navController.popBackStack() }
                     )
                 }
+                composable("login") {
+                    com.example.ui.auth.LoginScreen(
+                        onLoginSuccess = { navController.popBackStack() },
+                        onSkipOrGuest = { navController.popBackStack() },
+                        onBack = { navController.popBackStack() }
+                    )
+                }
                 composable("profile") {
                     com.example.ui.profile.ProfileScreen(
-                        onBack = { navController.popBackStack() }
+                        onBack = { navController.popBackStack() },
+                        onNavigateToLogin = { navController.navigate("login") }
                     )
                 }
                 composable(Screen.Home.route) {

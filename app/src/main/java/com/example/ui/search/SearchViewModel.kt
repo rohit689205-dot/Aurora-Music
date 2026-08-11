@@ -1,18 +1,14 @@
 package com.example.ui.search
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.data.providers.UnifiedMusicSearchRepository
+import com.example.data.MusicDatabase
+import com.example.data.MusicRepository
 import com.example.data.YTMusicSearchResult
 import com.example.ui.state.UiState
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 enum class SearchFilter(val label: String) {
@@ -23,9 +19,8 @@ enum class SearchFilter(val label: String) {
     PLAYLISTS("Playlists")
 }
 
-class SearchViewModel(
-    private val unifiedRepository: UnifiedMusicSearchRepository = UnifiedMusicSearchRepository()
-) : ViewModel() {
+class SearchViewModel(application: Application) : AndroidViewModel(application) {
+    private val repository = MusicRepository(MusicDatabase.getDatabase(application).songDao())
 
     private val _query = MutableStateFlow("")
     val query: StateFlow<String> = _query.asStateFlow()
@@ -76,7 +71,8 @@ class SearchViewModel(
         viewModelScope.launch {
             _searchState.value = UiState.Loading
             try {
-                val searchResult = unifiedRepository.searchAll(q)
+                repository.initializeWithSampleDataIfEmpty()
+                val searchResult = repository.search(getApplication(), q)
                 if (searchResult.songs.isEmpty() &&
                     searchResult.artists.isEmpty() &&
                     searchResult.albums.isEmpty() &&
